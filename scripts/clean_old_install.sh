@@ -11,6 +11,7 @@ if [ -d "/usr/local/include/eosio" ]; then
                exit -1
             fi
             pushd /usr/local &> /dev/null
+
             pushd include &> /dev/null
             rm -rf appbase chainbase eosio eosio.system eosiolib fc libc++ musl &> /dev/null
             popd &> /dev/null
@@ -38,8 +39,10 @@ if [ -d "/usr/local/include/eosio" ]; then
             pushd var/log &> /dev/null
             rm eosio &> /dev/null
             popd &> /dev/null
+
+            popd &> /dev/null
             break;;
-         [Nn]* ) 
+         [Nn]* )
             printf "\tAborting uninstall\n\n"
             exit -1;;
       esac
