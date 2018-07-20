@@ -75,6 +75,8 @@ install( TARGETS
    LIBRARY DESTINATION ${CMAKE_INSTALL_FULL_LIBDIR}
    ARCHIVE DESTINATION ${CMAKE_INSTALL_FULL_LIBDIR}
 )
+
+# Do we really need the var/{log,lib}/eosio empty folders to be installed?
 install(DIRECTORY DESTINATION ${CMAKE_INSTALL_FULL_LOCALSTATEDIR}/log/eosio
         DIRECTORY_PERMISSIONS OWNER_READ
                               OWNER_WRITE
