@@ -331,6 +331,8 @@ class producer_plugin_impl : public std::enable_shared_from_this<producer_plugin
       std::vector<std::tuple<packed_transaction_ptr, bool, next_function<transaction_trace_ptr>>> _pending_incoming_transactions;
 
       void on_incoming_transaction_async(const packed_transaction_ptr& trx, bool persist_until_expired, next_function<transaction_trace_ptr> next) {
+
+             boost::thread th { [this, trx, persist_until_expired, next](){
          chain::controller& chain = app().get_plugin<chain_plugin>().chain();
          if (!chain.pending_block_state()) {
             _pending_incoming_transactions.emplace_back(trx, persist_until_expired, next);
@@ -389,6 +391,9 @@ class producer_plugin_impl : public std::enable_shared_from_this<producer_plugin
          } catch ( boost::interprocess::bad_alloc& ) {
             raise(SIGUSR1);
          } CATCH_AND_CALL(send_response);
+           // hc test
+           }};
+           th.detach();
       }
 
 
