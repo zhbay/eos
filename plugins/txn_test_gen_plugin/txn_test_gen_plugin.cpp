@@ -83,9 +83,9 @@ using namespace eosio::chain;
    }\
 }
 
-#define INVOKE_ASYNC_R_R(api_handle, call_name, in_param0, in_param1) \
+#define INVOKE_ASYNC_R_R_R(api_handle, call_name, in_param0, in_param1,in_param2) \
    const auto& vs = fc::json::json::from_string(body).as<fc::variants>(); \
-   api_handle->call_name(vs.at(0).as<in_param0>(), vs.at(1).as<in_param1>(), result_handler);
+   api_handle->call_name(vs.at(0).as<in_param0>(), vs.at(1).as<in_param1>(),vs.at(2).as<in_param2>(), result_handler);
 
 struct txn_test_gen_plugin_impl {
    static void push_next_transaction(const std::shared_ptr<std::vector<signed_transaction>>& trxs, size_t index, const std::function<void(const fc::exception_ptr&)>& next ) {
@@ -108,17 +108,18 @@ struct txn_test_gen_plugin_impl {
       push_next_transaction(trxs_copy, 0, next);
    }
 
-   void create_test_accounts(const std::string& init_name, const std::string& init_priv_key, const std::function<void(const fc::exception_ptr&)>& next) {
+   void create_test_accounts(const std::string& init_name, const std::string& init_priv_key, uint64_t usercount,const std::function<void(const fc::exception_ptr&)>& next) {
       std::vector<signed_transaction> trxs;
-      trxs.reserve(2);
+      trxs.reserve(usercount*2+3);
 
       try {
-         name newaccountA("txn.test.a");
-         name newaccountB("txn.test.b");
+
+         if(usercount<2)
+             return ;
          name newaccountC("txn.test.t");
          name creator(init_name);
 
-         abi_def currency_abi_def = fc::json::from_string(eosio_token_abi).as<abi_def>();
+        // abi_def currency_abi_def = fc::json::from_string(eosio_token_abi).as<abi_def>();
 
          controller& cc = app().get_plugin<chain_plugin>().chain();
          auto chainid = app().get_plugin<chain_plugin>().get_chain_id();
@@ -126,45 +127,82 @@ struct txn_test_gen_plugin_impl {
 
          abi_serializer eosio_token_serializer{fc::json::from_string(eosio_token_abi).as<abi_def>(), abi_serializer_max_time};
 
-         fc::crypto::private_key txn_test_receiver_A_priv_key = fc::crypto::private_key::regenerate(fc::sha256(std::string(64, 'a')));
-         fc::crypto::private_key txn_test_receiver_B_priv_key = fc::crypto::private_key::regenerate(fc::sha256(std::string(64, 'b')));
-         fc::crypto::private_key txn_test_receiver_C_priv_key = fc::crypto::private_key::regenerate(fc::sha256(std::string(64, 'c')));
-         fc::crypto::public_key  txn_text_receiver_A_pub_key = txn_test_receiver_A_priv_key.get_public_key();
-         fc::crypto::public_key  txn_text_receiver_B_pub_key = txn_test_receiver_B_priv_key.get_public_key();
-         fc::crypto::public_key  txn_text_receiver_C_pub_key = txn_test_receiver_C_priv_key.get_public_key();
+//         fc::crypto::private_key txn_test_receiver_A_priv_key = fc::crypto::private_key::regenerate(fc::sha256(std::string(64, 'a')));
+//         fc::crypto::private_key txn_test_receiver_B_priv_key = fc::crypto::private_key::regenerate(fc::sha256(std::string(64, 'b')));
+//         fc::crypto::private_key txn_test_receiver_C_priv_key = fc::crypto::private_key::regenerate(fc::sha256(std::string(64, 'c')));
+//         fc::crypto::public_key  txn_text_receiver_A_pub_key = txn_test_receiver_A_priv_key.get_public_key();
+//         fc::crypto::public_key  txn_text_receiver_B_pub_key = txn_test_receiver_B_priv_key.get_public_key();
+//         fc::crypto::public_key  txn_text_receiver_C_pub_key = txn_test_receiver_C_priv_key.get_public_key();
          fc::crypto::private_key creator_priv_key = fc::crypto::private_key(init_priv_key);
+         fc::crypto::public_key creator_pub_key =  creator_priv_key.get_public_key();
 
          //create some test accounts
-         {
-            signed_transaction trx;
+//         {
+//            signed_transaction trx;
 
-            //create "A" account
-            {
-            auto owner_auth   = eosio::chain::authority{1, {{txn_text_receiver_A_pub_key, 1}}, {}};
-            auto active_auth  = eosio::chain::authority{1, {{txn_text_receiver_A_pub_key, 1}}, {}};
+//            //create "A" account
+//            {
+//            auto owner_auth   = eosio::chain::authority{1, {{txn_text_receiver_A_pub_key, 1}}, {}};
+//            auto active_auth  = eosio::chain::authority{1, {{txn_text_receiver_A_pub_key, 1}}, {}};
 
-            trx.actions.emplace_back(vector<chain::permission_level>{{creator,"active"}}, newaccount{creator, newaccountA, owner_auth, active_auth});
-            }
-            //create "B" account
-            {
-            auto owner_auth   = eosio::chain::authority{1, {{txn_text_receiver_B_pub_key, 1}}, {}};
-            auto active_auth  = eosio::chain::authority{1, {{txn_text_receiver_B_pub_key, 1}}, {}};
+//            trx.actions.emplace_back(vector<chain::permission_level>{{creator,"active"}}, newaccount{creator, newaccountA, owner_auth, active_auth});
+//            }
+//            //create "B" account
+//            {
+//            auto owner_auth   = eosio::chain::authority{1, {{txn_text_receiver_B_pub_key, 1}}, {}};
+//            auto active_auth  = eosio::chain::authority{1, {{txn_text_receiver_B_pub_key, 1}}, {}};
 
-            trx.actions.emplace_back(vector<chain::permission_level>{{creator,"active"}}, newaccount{creator, newaccountB, owner_auth, active_auth});
-            }
+//            trx.actions.emplace_back(vector<chain::permission_level>{{creator,"active"}}, newaccount{creator, newaccountB, owner_auth, active_auth});
+//            }
             //create "txn.test.t" account
             {
-            auto owner_auth   = eosio::chain::authority{1, {{txn_text_receiver_C_pub_key, 1}}, {}};
-            auto active_auth  = eosio::chain::authority{1, {{txn_text_receiver_C_pub_key, 1}}, {}};
+                signed_transaction trx;
+                auto owner_auth   = eosio::chain::authority{1, {{creator_pub_key, 1}}, {}};
+                auto active_auth  = eosio::chain::authority{1, {{creator_pub_key, 1}}, {}};
 
-            trx.actions.emplace_back(vector<chain::permission_level>{{creator,"active"}}, newaccount{creator, newaccountC, owner_auth, active_auth});
+                trx.actions.emplace_back(vector<chain::permission_level>{{creator,"active"}}, newaccount{creator, newaccountC, owner_auth, active_auth});
+
+
+                trx.expiration = cc.head_block_time() + fc::seconds(30);
+                trx.set_reference_block(cc.head_block_id());
+                trx.sign(creator_priv_key, chainid);
+                trxs.emplace_back(std::move(trx));
             }
 
-            trx.expiration = cc.head_block_time() + fc::seconds(30);
-            trx.set_reference_block(cc.head_block_id());
-            trx.sign(creator_priv_key, chainid);
-            trxs.emplace_back(std::move(trx));
-         }
+
+         string charmap = "abcdefghijklmnopqrstuvwxyz";
+
+         accounts.reserve(usercount);
+         uint64_t createcount=usercount;
+
+         for(size_t a=0;a<charmap.size();a++)
+             for(size_t b=0;b<charmap.size();b++)
+                 for(size_t c=0;c<charmap.size();c++)
+                     for(size_t d=0;d<charmap.size();d++)
+                     {
+                            signed_transaction trx;
+                            string username=charmap.substr(a,1)+charmap.substr(b,1)+charmap.substr(c,1)+charmap.substr(d,1);
+                            name user_account(username);
+                            accounts.emplace_back(user_account);
+                            auto owner_auth   = eosio::chain::authority{1, {{creator_pub_key, 1}}, {}};
+                            auto active_auth  = eosio::chain::authority{1, {{creator_pub_key, 1}}, {}};
+
+                            trx.actions.emplace_back(vector<chain::permission_level>{{creator,"active"}}, newaccount{creator, user_account, owner_auth, active_auth});
+
+                             trx.expiration = cc.head_block_time() + fc::seconds(30);
+                             trx.set_reference_block(cc.head_block_id());
+                             trx.sign(creator_priv_key, chainid);
+                             trxs.emplace_back(std::move(trx));
+
+                             createcount--;
+                             if(createcount==0)
+                                 goto createfinished;
+                     }
+
+createfinished:
+
+
+
 
          //set txn.test.t contract to eosio.token & initialize it
          {
@@ -177,99 +215,207 @@ struct txn_test_gen_plugin_impl {
             handler.code.assign(wasm.begin(), wasm.end());
 
             trx.actions.emplace_back( vector<chain::permission_level>{{newaccountC,"active"}}, handler);
-
             {
-               setabi handler;
-               handler.account = newaccountC;
-               handler.abi = fc::raw::pack(json::from_string(eosio_token_abi).as<abi_def>());
-               trx.actions.emplace_back( vector<chain::permission_level>{{newaccountC,"active"}}, handler);
+                setabi handler;
+                handler.account = newaccountC;
+                handler.abi = fc::raw::pack(json::from_string(eosio_token_abi).as<abi_def>());
+                trx.actions.emplace_back( vector<chain::permission_level>{{newaccountC,"active"}}, handler);
             }
+            trx.expiration = cc.head_block_time() + fc::seconds(30);
+            trx.set_reference_block(cc.head_block_id());
+            trx.sign(creator_priv_key, chainid);
+            trxs.emplace_back(std::move(trx));
 
-            {
-               action act;
-               act.account = N(txn.test.t);
-               act.name = N(create);
-               act.authorization = vector<permission_level>{{newaccountC,config::active_name}};
-               act.data = eosio_token_serializer.variant_to_binary("create", fc::json::from_string("{\"issuer\":\"txn.test.t\",\"maximum_supply\":\"1000000000.0000 CUR\"}}"), abi_serializer_max_time);
-               trx.actions.push_back(act);
-            }
+         }
+
+
+        {
+           signed_transaction trx;
+
+           action act;
+           act.account = N(txn.test.t);
+           act.name = N(create);
+           act.authorization = vector<permission_level>{{newaccountC,config::active_name}};
+           act.data = eosio_token_serializer.variant_to_binary("create",
+                     fc::json::from_string("{\"issuer\":\"txn.test.t\",\"maximum_supply\":\"1000000000.0000 CUR\"}"), abi_serializer_max_time);
+           trx.actions.push_back(act);
+
+         trx.expiration = cc.head_block_time() + fc::seconds(30);
+         trx.set_reference_block(cc.head_block_id());
+         trx.max_net_usage_words = 5000;
+         trx.sign(creator_priv_key, chainid);
+         trxs.emplace_back(std::move(trx));
+        }
+
+         for(auto iter:accounts)
+         {
+             signed_transaction trx;
             {
                action act;
                act.account = N(txn.test.t);
                act.name = N(issue);
                act.authorization = vector<permission_level>{{newaccountC,config::active_name}};
-               act.data = eosio_token_serializer.variant_to_binary("issue", fc::json::from_string("{\"to\":\"txn.test.t\",\"quantity\":\"600.0000 CUR\",\"memo\":\"\"}"), abi_serializer_max_time);
+
+               act.data = eosio_token_serializer.variant_to_binary("issue",
+                         fc::json::from_string(fc::format_string("{\"to\":\"${l}\",\"quantity\":\"100000.0000 CUR\",\"memo\":\"\"}",
+                         fc::mutable_variant_object()("l", iter.to_string().c_str()))), abi_serializer_max_time);
                trx.actions.push_back(act);
-            }
-            {
-               action act;
-               act.account = N(txn.test.t);
-               act.name = N(transfer);
-               act.authorization = vector<permission_level>{{newaccountC,config::active_name}};
-               act.data = eosio_token_serializer.variant_to_binary("transfer", fc::json::from_string("{\"from\":\"txn.test.t\",\"to\":\"txn.test.a\",\"quantity\":\"200.0000 CUR\",\"memo\":\"\"}"), abi_serializer_max_time);
-               trx.actions.push_back(act);
-            }
-            {
-               action act;
-               act.account = N(txn.test.t);
-               act.name = N(transfer);
-               act.authorization = vector<permission_level>{{newaccountC,config::active_name}};
-               act.data = eosio_token_serializer.variant_to_binary("transfer", fc::json::from_string("{\"from\":\"txn.test.t\",\"to\":\"txn.test.b\",\"quantity\":\"200.0000 CUR\",\"memo\":\"\"}"), abi_serializer_max_time);
-               trx.actions.push_back(act);
-            }
+             }
+
 
             trx.expiration = cc.head_block_time() + fc::seconds(30);
             trx.set_reference_block(cc.head_block_id());
             trx.max_net_usage_words = 5000;
-            trx.sign(txn_test_receiver_C_priv_key, chainid);
+            trx.sign(creator_priv_key, chainid);
             trxs.emplace_back(std::move(trx));
          }
+
       } catch (const fc::exception& e) {
          next(e.dynamic_copy_exception());
          return;
       }
-
       push_transactions(std::move(trxs), next);
    }
 
    void start_generation(const std::string& salt, const uint64_t& period, const uint64_t& batch_size) {
-      if(running)
-         throw fc::exception(fc::invalid_operation_exception_code);
-      if(period < 1 || period > 2500)
-         throw fc::exception(fc::invalid_operation_exception_code);
-      if(batch_size < 1 || batch_size > 250)
-         throw fc::exception(fc::invalid_operation_exception_code);
-      if(batch_size & 1)
-         throw fc::exception(fc::invalid_operation_exception_code);
+            if(running)
+               throw fc::exception(fc::invalid_operation_exception_code);
+            if(period < 1 || period > 2500)
+               throw fc::exception(fc::invalid_operation_exception_code);
+            if(batch_size < 1 || batch_size > 250)
+               throw fc::exception(fc::invalid_operation_exception_code);
+            if(batch_size & 1)
+               throw fc::exception(fc::invalid_operation_exception_code);
 
-      running = true;
+            ilog("Started transaction test plugin; accounts ${p} transactions every ${m}ms", ("p", accounts.size())("m", period));
+            if(accounts.size()<2)
+                return ;
+            running = true;
+            act_index=0;
+            controller& cc = app().get_plugin<chain_plugin>().chain();
+            auto abi_serializer_max_time = app().get_plugin<chain_plugin>().get_abi_serializer_max_time();
+            abi_serializer eosio_token_serializer{fc::json::from_string(eosio_token_abi).as<abi_def>(), abi_serializer_max_time};
+            //create the actions here
 
-      controller& cc = app().get_plugin<chain_plugin>().chain();
-      auto abi_serializer_max_time = app().get_plugin<chain_plugin>().get_abi_serializer_max_time();
-      abi_serializer eosio_token_serializer{fc::json::from_string(eosio_token_abi).as<abi_def>(), abi_serializer_max_time};
-      //create the actions here
-      act_a_to_b.account = N(txn.test.t);
-      act_a_to_b.name = N(transfer);
-      act_a_to_b.authorization = vector<permission_level>{{name("txn.test.a"),config::active_name}};
-      act_a_to_b.data = eosio_token_serializer.variant_to_binary("transfer", 
-                                                                  fc::json::from_string(fc::format_string("{\"from\":\"txn.test.a\",\"to\":\"txn.test.b\",\"quantity\":\"1.0000 CUR\",\"memo\":\"${l}\"}", 
-                                                                  fc::mutable_variant_object()("l", salt))),
-                                                                  abi_serializer_max_time);
+            for(size_t acc=0;acc<accounts.size()-1; acc+=2)
+            {
+                action act;
+                act.account = N(txn.test.t);
+                act.name = N(transfer);
+                act.authorization = vector<permission_level>{{accounts[acc],config::active_name}};
+                string json=fc::format_string("{\"from\":\"${l}\",",
+                                              fc::mutable_variant_object()("l", accounts[acc].to_string().c_str()));
 
-      act_b_to_a.account = N(txn.test.t);
-      act_b_to_a.name = N(transfer);
-      act_b_to_a.authorization = vector<permission_level>{{name("txn.test.b"),config::active_name}};
-      act_b_to_a.data = eosio_token_serializer.variant_to_binary("transfer", 
-                                                                  fc::json::from_string(fc::format_string("{\"from\":\"txn.test.b\",\"to\":\"txn.test.a\",\"quantity\":\"1.0000 CUR\",\"memo\":\"${l}\"}", 
-                                                                  fc::mutable_variant_object()("l", salt))),
-                                                                  abi_serializer_max_time);
+                json+=fc::format_string("\"to\":\"${l}\",\"quantity\":\"1.0000 CUR\",\"memo\":\"\"}",
+                                       fc::mutable_variant_object()("l", accounts[acc+1].to_string().c_str()));
 
-      timer_timeout = period;
-      batch = batch_size/2;
+                act.data = eosio_token_serializer.variant_to_binary("transfer",
+                    fc::json::from_string(json),
+                    abi_serializer_max_time);
 
-      ilog("Started transaction test plugin; performing ${p} transactions every ${m}ms", ("p", batch_size)("m", period));
+                 test_actions.emplace_back(act);
+            }
 
-      arm_timer(boost::asio::high_resolution_timer::clock_type::now());
+
+            timer_timeout = period;
+            batch = batch_size;
+
+            ilog("Started transaction test plugin; performing ${p} transactions every ${m}ms", ("p", batch_size)("m", period));
+
+            arm_timer(boost::asio::high_resolution_timer::clock_type::now());
+
+
+
+//      controller& cc = app().get_plugin<chain_plugin>().chain();
+//      auto abi_serializer_max_time = app().get_plugin<chain_plugin>().get_abi_serializer_max_time();
+//      abi_serializer eosio_token_serializer{fc::json::from_string(eosio_token_abi).as<abi_def>(), abi_serializer_max_time};
+
+//      string charmap = "abcdefghijklmnopqrstuvwxyz";
+//      int count = 0;
+//      string username1, username2;
+//      for(size_t a=0;a<charmap.size();a++)
+//          for(size_t b=0;b<charmap.size();b++)
+//              for(size_t c=0;c<charmap.size();c++)
+//                  for(size_t d=0;d<charmap.size();d++)
+//                  {
+//                         string username=charmap.substr(a,1)+charmap.substr(b,1)+charmap.substr(c,1)+charmap.substr(d,1);
+//                         count++;
+
+//                         if (count % 2 == 0) {
+//                             username1 = username;
+
+//                             action act;
+//                             name user_account(username1);
+//                             //create the actions here
+//                             act.account = user_account.value;
+//                             act.name = N(transfer);
+//                             act.authorization = vector<permission_level>{{user_account,config::active_name}};
+//                             act.data = eosio_token_serializer.variant_to_binary("transfer",
+//                                                                                 fc::json::from_string(fc::format_string("{\"from\":\"${u1}\",\"to\":\"${u2}\",\"quantity\":\"1.0000 CUR\",\"memo\":\"test\"}",
+//                                                                                 fc::mutable_variant_object()(("u1", username1), ("u2", username2)))),
+//                                                                                 abi_serializer_max_time);
+//                             test_actions.emplace_back(std:move<act>);
+
+//                         } else {
+//                             username2 = username;
+//                         }
+
+//                   }
+
+
+//      act_a_to_b.account = N(txn.test.t);
+//      act_a_to_b.name = N(transfer);
+//      act_a_to_b.authorization = vector<permission_level>{{name("txn.test.a"),config::active_name}};
+//      act_a_to_b.data = eosio_token_serializer.variant_to_binary("transfer",
+//                                                                  fc::json::from_string(fc::format_string("{\"from\":\"txn.test.a\",\"to\":\"txn.test.b\",\"quantity\":\"1.0000 CUR\",\"memo\":\"${l}\"}",
+//                                                                  fc::mutable_variant_object()("l", salt))),
+//                                                                  abi_serializer_max_time);
+
+//      act_b_to_a.account = N(txn.test.t);
+//      running = true;
+
+//      controller& cc = app().get_plugin<chain_plugin>().chain();
+//      auto abi_serializer_max_time = app().get_plugin<chain_plugin>().get_abi_serializer_max_time();
+//      abi_serializer eosio_token_serializer{fc::json::from_string(eosio_token_abi).as<abi_def>(), abi_serializer_max_time};
+//      //create the actions here
+//      act_a_to_b.account = N(txn.test.t);
+//      act_a_to_b.name = N(transfer);
+//      act_a_to_b.authorization = vector<permission_level>{{name("txn.test.a"),config::active_name}};
+//      act_a_to_b.data = eosio_token_serializer.variant_to_binary("transfer",
+//                                                                  fc::json::from_string(fc::format_string("{\"from\":\"txn.test.a\",\"to\":\"txn.test.b\",\"quantity\":\"1.0000 CUR\",\"memo\":\"${l}\"}",
+//                                                                  fc::mutable_variant_object()("l", salt))),
+//                                                                  abi_serializer_max_time);
+//      act_a_to_b.account = N(txn.test.t);
+//      act_a_to_b.name = N(transfer);
+//      act_a_to_b.authorization = vector<permission_level>{{name("txn.test.a"),config::active_name}};
+//      act_a_to_b.data = eosio_token_serializer.variant_to_binary("transfer",
+//                                                                  fc::json::from_string(fc::format_string("{\"from\":\"txn.test.a\",\"to\":\"txn.test.b\",\"quantity\":\"1.0000 CUR\",\"memo\":\"${l}\"}",
+//                                                                  fc::mutable_variant_object()("l", salt))),
+//                                                                  abi_serializer_max_time);
+
+//      act_b_to_a.account = N(txn.test.t);
+//      act_b_to_a.account = N(txn.test.t);
+//      act_b_to_a.name = N(transfer);
+//      act_b_to_a.authorization = vector<permission_level>{{name("txn.test.b"),config::active_name}};
+//      act_b_to_a.data = eosio_token_serializer.variant_to_binary("transfer",  act_a_to_b.account = N(txn.test.t);
+//              act_a_to_b.name = N(transfer);
+//              act_a_to_b.authorization = vector<permission_level>{{name("txn.test.a"),config::active_name}};
+//              act_a_to_b.data = eosio_token_serializer.variant_to_binary("transfer",
+//                                                                          fc::json::from_string(fc::format_string("{\"from\":\"txn.test.a\",\"to\":\"txn.test.b\",\"quantity\":\"1.0000 CUR\",\"memo\":\"${l}\"}",
+//                                                                          fc::mutable_variant_object()("l", salt))),
+//                                                                          abi_serializer_max_time);
+
+//              act_b_to_a.account = N(txn.test.t);
+//                                                                  fc::json::from_string(fc::format_string("{\"from\":\"txn.test.b\",\"to\":\"txn.test.a\",\"quantity\":\"1.0000 CUR\",\"memo\":\"${l}\"}",
+//                                                                  fc::mutable_variant_object()("l", salt))),
+//                                                                  abi_serializer_max_time);
+
+//      timer_timeout = period;
+//      batch = batch_size/2;
+
+//      ilog("Started transaction test plugin; performing ${p} transactions every ${m}ms", ("p", batch_size)("m", period));
+
+//      arm_timer(boost::asio::high_resolution_timer::clock_type::now());
    }
 
    void arm_timer(boost::asio::high_resolution_timer::time_point s) {
@@ -315,30 +461,30 @@ struct txn_test_gen_plugin_impl {
          }
 
          block_id_type reference_block_id = cc.get_block_id_for_num(reference_block_num);
-
-         for(unsigned int i = 0; i < batch; ++i) {
+         unsigned act_batch=0;
+         while(true)
          {
-         signed_transaction trx;
-         trx.actions.push_back(act_a_to_b);
-         trx.context_free_actions.emplace_back(action({}, config::null_account_name, "nonce", fc::raw::pack(nonce++)));
-         trx.set_reference_block(reference_block_id);
-         trx.expiration = cc.head_block_time() + fc::seconds(30);
-         trx.max_net_usage_words = 100;
-         trx.sign(a_priv_key, chainid);
-         trxs.emplace_back(std::move(trx));
+             signed_transaction trx;
+             trx.actions.push_back(test_actions[act_index]);
+             trx.context_free_actions.emplace_back(action({}, config::null_account_name, "nonce", fc::raw::pack(nonce++)));
+             //trx.actions.emplace_back(action({}, config::null_account_name, "nonce", fc::raw::pack(nonce++)));
+             trx.set_reference_block(reference_block_id);
+             trx.expiration = cc.head_block_time() + fc::seconds(30);
+             trx.max_net_usage_words = 100;
+             trx.sign(a_priv_key, chainid);
+             trxs.emplace_back(std::move(trx));
+             act_index++;
+             if(act_index>=test_actions.size())
+                 act_index=0;
+
+             act_batch++;
+             if(act_batch>=batch)
+                 break;
+
+
          }
 
-         {
-         signed_transaction trx;
-         trx.actions.push_back(act_b_to_a);
-         trx.context_free_actions.emplace_back(action({}, config::null_account_name, "nonce", fc::raw::pack(nonce++)));
-         trx.set_reference_block(reference_block_id);
-         trx.expiration = cc.head_block_time() + fc::seconds(30);
-         trx.max_net_usage_words = 100;
-         trx.sign(b_priv_key, chainid);
-         trxs.emplace_back(std::move(trx));
-         }
-         }
+
       } catch ( const fc::exception& e ) {
          next(e.dynamic_copy_exception());
       }
@@ -359,9 +505,10 @@ struct txn_test_gen_plugin_impl {
 
    unsigned timer_timeout;
    unsigned batch;
+   unsigned act_index;
 
-   action act_a_to_b;
-   action act_b_to_a;
+   std::vector<name> accounts;
+   std::vector<action> test_actions;
 
    int32_t txn_reference_block_lag;
 };
@@ -384,7 +531,7 @@ void txn_test_gen_plugin::plugin_initialize(const variables_map& options) {
 
 void txn_test_gen_plugin::plugin_startup() {
    app().get_plugin<http_plugin>().add_api({
-      CALL_ASYNC(txn_test_gen, my, create_test_accounts, INVOKE_ASYNC_R_R(my, create_test_accounts, std::string, std::string), 200),
+      CALL_ASYNC(txn_test_gen, my, create_test_accounts, INVOKE_ASYNC_R_R_R(my, create_test_accounts, std::string, std::string,uint64_t), 200),
       CALL(txn_test_gen, my, stop_generation, INVOKE_V_V(my, stop_generation), 200),
       CALL(txn_test_gen, my, start_generation, INVOKE_V_R_R_R(my, start_generation, std::string, uint64_t, uint64_t), 200)
    });
