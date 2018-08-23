@@ -23,16 +23,16 @@
 #include <WASM/WASM.h>
 #include <Runtime/Runtime.h>
 
-#include "coinxp.match.abi.hpp"
-#include "coinxp.match.wast.hpp"
-#include "coinxp.latestprice.abi.hpp"
-#include "coinxp.latestprice.wast.hpp"
-#include "coinxp.orderdb.abi.hpp"
-#include "coinxp.orderdb.wast.hpp"
-#include "coinxp.exchange.abi.hpp"
-#include "coinxp.exchange.wast.hpp"
-#include "coinxp.bank.abi.hpp"
-#include "coinxp.bank.wast.hpp"
+#include "./coinxp.match.abi.hpp"
+#include "./coinxp.match.wast.hpp"
+#include "./coinxp.latestprice.abi.hpp"
+#include "./coinxp.latestprice.wast.hpp"
+#include "./coinxp.orderdb.abi.hpp"
+#include "./coinxp.orderdb.wast.hpp"
+#include "./coinxp.exchange.abi.hpp"
+#include "./coinxp.exchange.wast.hpp"
+#include "./coinxp.bank.abi.hpp"
+#include "./coinxp.bank.wast.hpp"
 
 namespace eosio { namespace detail {
   struct cxp_match_test_empty {};
