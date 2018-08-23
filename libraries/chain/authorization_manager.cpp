@@ -329,6 +329,7 @@ namespace eosio { namespace chain {
                                                bool                                 allow_unused_keys
                                              )const
    {
+	   return ;
       const auto& checktime = ( static_cast<bool>(_checktime) ? _checktime : _noop_checktime );
 
       auto delay_max_limit = fc::seconds( _control.get_global_properties().configuration.max_transaction_delay );

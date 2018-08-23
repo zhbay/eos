@@ -274,6 +274,7 @@ namespace eosio { namespace chain {
    }
 
    void transaction_context::check_net_usage()const {
+	   return ;
       if( BOOST_UNLIKELY(net_usage > eager_net_limit) ) {
          if ( net_limit_due_to_block ) {
             EOS_THROW( block_net_usage_exceeded,
@@ -292,6 +293,7 @@ namespace eosio { namespace chain {
    }
 
    void transaction_context::checktime()const {
+	   return ;
       auto now = fc::time_point::now();
       if( BOOST_UNLIKELY( now > _deadline ) ) {
          // edump((now-start)(now-pseudo_start));
