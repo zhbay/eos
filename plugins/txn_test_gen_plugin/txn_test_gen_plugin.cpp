@@ -116,6 +116,8 @@ struct txn_test_gen_plugin_impl {
 
          if(usercount<2)
              return ;
+         if(accounts.size()>0)
+             return ;
          name newaccountC("txn.test.t");
          name creator(init_name);
 
@@ -279,13 +281,18 @@ createfinished:
 
    void start_generation(const std::string& salt, const uint64_t& period, const uint64_t& batch_size) {
             if(running)
-               throw fc::exception(fc::invalid_operation_exception_code);
+            {
+                elog("pushing transaction stop");
+                stop_generation();
+                return ;
+            }
+
             if(period < 1 || period > 2500)
                throw fc::exception(fc::invalid_operation_exception_code);
-            if(batch_size < 1 || batch_size > 250)
-               throw fc::exception(fc::invalid_operation_exception_code);
-            if(batch_size & 1)
-               throw fc::exception(fc::invalid_operation_exception_code);
+//            if(batch_size < 1 || batch_size > 250)
+//               throw fc::exception(fc::invalid_operation_exception_code);
+//            if(batch_size & 1)
+//               throw fc::exception(fc::invalid_operation_exception_code);
 
             ilog("Started transaction test plugin; accounts ${p} transactions every ${m}ms", ("p", accounts.size())("m", period));
             if(accounts.size()<2)
@@ -315,7 +322,7 @@ createfinished:
 
                  test_actions.emplace_back(act);
             }
-
+            ilog("create action  ${p}", ("p", test_actions.size()));
 
             timer_timeout = period;
             batch = batch_size;
@@ -325,97 +332,6 @@ createfinished:
             arm_timer(boost::asio::high_resolution_timer::clock_type::now());
 
 
-
-//      controller& cc = app().get_plugin<chain_plugin>().chain();
-//      auto abi_serializer_max_time = app().get_plugin<chain_plugin>().get_abi_serializer_max_time();
-//      abi_serializer eosio_token_serializer{fc::json::from_string(eosio_token_abi).as<abi_def>(), abi_serializer_max_time};
-
-//      string charmap = "abcdefghijklmnopqrstuvwxyz";
-//      int count = 0;
-//      string username1, username2;
-//      for(size_t a=0;a<charmap.size();a++)
-//          for(size_t b=0;b<charmap.size();b++)
-//              for(size_t c=0;c<charmap.size();c++)
-//                  for(size_t d=0;d<charmap.size();d++)
-//                  {
-//                         string username=charmap.substr(a,1)+charmap.substr(b,1)+charmap.substr(c,1)+charmap.substr(d,1);
-//                         count++;
-
-//                         if (count % 2 == 0) {
-//                             username1 = username;
-
-//                             action act;
-//                             name user_account(username1);
-//                             //create the actions here
-//                             act.account = user_account.value;
-//                             act.name = N(transfer);
-//                             act.authorization = vector<permission_level>{{user_account,config::active_name}};
-//                             act.data = eosio_token_serializer.variant_to_binary("transfer",
-//                                                                                 fc::json::from_string(fc::format_string("{\"from\":\"${u1}\",\"to\":\"${u2}\",\"quantity\":\"1.0000 CUR\",\"memo\":\"test\"}",
-//                                                                                 fc::mutable_variant_object()(("u1", username1), ("u2", username2)))),
-//                                                                                 abi_serializer_max_time);
-//                             test_actions.emplace_back(std:move<act>);
-
-//                         } else {
-//                             username2 = username;
-//                         }
-
-//                   }
-
-
-//      act_a_to_b.account = N(txn.test.t);
-//      act_a_to_b.name = N(transfer);
-//      act_a_to_b.authorization = vector<permission_level>{{name("txn.test.a"),config::active_name}};
-//      act_a_to_b.data = eosio_token_serializer.variant_to_binary("transfer",
-//                                                                  fc::json::from_string(fc::format_string("{\"from\":\"txn.test.a\",\"to\":\"txn.test.b\",\"quantity\":\"1.0000 CUR\",\"memo\":\"${l}\"}",
-//                                                                  fc::mutable_variant_object()("l", salt))),
-//                                                                  abi_serializer_max_time);
-
-//      act_b_to_a.account = N(txn.test.t);
-//      running = true;
-
-//      controller& cc = app().get_plugin<chain_plugin>().chain();
-//      auto abi_serializer_max_time = app().get_plugin<chain_plugin>().get_abi_serializer_max_time();
-//      abi_serializer eosio_token_serializer{fc::json::from_string(eosio_token_abi).as<abi_def>(), abi_serializer_max_time};
-//      //create the actions here
-//      act_a_to_b.account = N(txn.test.t);
-//      act_a_to_b.name = N(transfer);
-//      act_a_to_b.authorization = vector<permission_level>{{name("txn.test.a"),config::active_name}};
-//      act_a_to_b.data = eosio_token_serializer.variant_to_binary("transfer",
-//                                                                  fc::json::from_string(fc::format_string("{\"from\":\"txn.test.a\",\"to\":\"txn.test.b\",\"quantity\":\"1.0000 CUR\",\"memo\":\"${l}\"}",
-//                                                                  fc::mutable_variant_object()("l", salt))),
-//                                                                  abi_serializer_max_time);
-//      act_a_to_b.account = N(txn.test.t);
-//      act_a_to_b.name = N(transfer);
-//      act_a_to_b.authorization = vector<permission_level>{{name("txn.test.a"),config::active_name}};
-//      act_a_to_b.data = eosio_token_serializer.variant_to_binary("transfer",
-//                                                                  fc::json::from_string(fc::format_string("{\"from\":\"txn.test.a\",\"to\":\"txn.test.b\",\"quantity\":\"1.0000 CUR\",\"memo\":\"${l}\"}",
-//                                                                  fc::mutable_variant_object()("l", salt))),
-//                                                                  abi_serializer_max_time);
-
-//      act_b_to_a.account = N(txn.test.t);
-//      act_b_to_a.account = N(txn.test.t);
-//      act_b_to_a.name = N(transfer);
-//      act_b_to_a.authorization = vector<permission_level>{{name("txn.test.b"),config::active_name}};
-//      act_b_to_a.data = eosio_token_serializer.variant_to_binary("transfer",  act_a_to_b.account = N(txn.test.t);
-//              act_a_to_b.name = N(transfer);
-//              act_a_to_b.authorization = vector<permission_level>{{name("txn.test.a"),config::active_name}};
-//              act_a_to_b.data = eosio_token_serializer.variant_to_binary("transfer",
-//                                                                          fc::json::from_string(fc::format_string("{\"from\":\"txn.test.a\",\"to\":\"txn.test.b\",\"quantity\":\"1.0000 CUR\",\"memo\":\"${l}\"}",
-//                                                                          fc::mutable_variant_object()("l", salt))),
-//                                                                          abi_serializer_max_time);
-
-//              act_b_to_a.account = N(txn.test.t);
-//                                                                  fc::json::from_string(fc::format_string("{\"from\":\"txn.test.b\",\"to\":\"txn.test.a\",\"quantity\":\"1.0000 CUR\",\"memo\":\"${l}\"}",
-//                                                                  fc::mutable_variant_object()("l", salt))),
-//                                                                  abi_serializer_max_time);
-
-//      timer_timeout = period;
-//      batch = batch_size/2;
-
-//      ilog("Started transaction test plugin; performing ${p} transactions every ${m}ms", ("p", batch_size)("m", period));
-
-//      arm_timer(boost::asio::high_resolution_timer::clock_type::now());
    }
 
    void arm_timer(boost::asio::high_resolution_timer::time_point s) {
@@ -437,7 +353,7 @@ createfinished:
 
    void send_transaction(std::function<void(const fc::exception_ptr&)> next) {
       std::vector<signed_transaction> trxs;
-      trxs.reserve(2*batch);
+      trxs.reserve(batch);
 
       try {
          controller& cc = app().get_plugin<chain_plugin>().chain();
@@ -488,8 +404,9 @@ createfinished:
       } catch ( const fc::exception& e ) {
          next(e.dynamic_copy_exception());
       }
-
+      unsigned trans_count=trxs.size();
       push_transactions(std::move(trxs), next);
+      ilog("push_transactions  ${p}", ("p", trans_count));
    }
 
    void stop_generation() {
@@ -497,6 +414,7 @@ createfinished:
          throw fc::exception(fc::invalid_operation_exception_code);
       timer.cancel();
       running = false;
+      test_actions.clear();
       ilog("Stopping transaction generation test");
    }
 
