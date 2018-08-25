@@ -239,7 +239,7 @@ createfinished:
            act.name = N(create);
            act.authorization = vector<permission_level>{{newaccountC,config::active_name}};
            act.data = eosio_token_serializer.variant_to_binary("create",
-                     fc::json::from_string("{\"issuer\":\"txn.test.t\",\"maximum_supply\":\"1000000000.0000 CUR\"}"), abi_serializer_max_time);
+                     fc::json::from_string("{\"issuer\":\"txn.test.t\",\"maximum_supply\":\"100000000000.0000 CUR\"}"), abi_serializer_max_time);
            trx.actions.push_back(act);
 
          trx.expiration = cc.head_block_time() + fc::seconds(30);
@@ -248,6 +248,7 @@ createfinished:
          trx.sign(creator_priv_key, chainid);
          trxs.emplace_back(std::move(trx));
         }
+
 
          for(auto iter:accounts)
          {
@@ -259,17 +260,18 @@ createfinished:
                act.authorization = vector<permission_level>{{newaccountC,config::active_name}};
 
                act.data = eosio_token_serializer.variant_to_binary("issue",
-                         fc::json::from_string(fc::format_string("{\"to\":\"${l}\",\"quantity\":\"100000.0000 CUR\",\"memo\":\"\"}",
+                         fc::json::from_string(fc::format_string("{\"to\":\"${l}\",\"quantity\":\"1000000.0000 CUR\",\"memo\":\"\"}",
                          fc::mutable_variant_object()("l", iter.to_string().c_str()))), abi_serializer_max_time);
                trx.actions.push_back(act);
              }
 
 
-            trx.expiration = cc.head_block_time() + fc::seconds(30);
+            trx.expiration = cc.head_block_time() + fc::seconds(3600);
             trx.set_reference_block(cc.head_block_id());
             trx.max_net_usage_words = 5000;
             trx.sign(creator_priv_key, chainid);
             trxs.emplace_back(std::move(trx));
+
          }
 
       } catch (const fc::exception& e) {
@@ -343,7 +345,7 @@ createfinished:
          send_transaction([this](const fc::exception_ptr& e){
             if (e) {
                elog("pushing transaction failed: ${e}", ("e", e->to_detail_string()));
-               stop_generation();
+               //stop_generation();
             } else {
                arm_timer(timer.expires_at());
             }
@@ -385,7 +387,7 @@ createfinished:
              trx.context_free_actions.emplace_back(action({}, config::null_account_name, "nonce", fc::raw::pack(nonce++)));
              //trx.actions.emplace_back(action({}, config::null_account_name, "nonce", fc::raw::pack(nonce++)));
              trx.set_reference_block(reference_block_id);
-             trx.expiration = cc.head_block_time() + fc::seconds(30);
+             trx.expiration = cc.head_block_time() + fc::seconds(3600);
              trx.max_net_usage_words = 100;
              trx.sign(a_priv_key, chainid);
              trxs.emplace_back(std::move(trx));
@@ -405,8 +407,9 @@ createfinished:
          next(e.dynamic_copy_exception());
       }
       unsigned trans_count=trxs.size();
+      ilog("start push_transactions  ${p}", ("p", trans_count));
       push_transactions(std::move(trxs), next);
-      ilog("push_transactions  ${p}", ("p", trans_count));
+      ilog("finish push_transactions  ${p}", ("p", trans_count));
    }
 
    void stop_generation() {
