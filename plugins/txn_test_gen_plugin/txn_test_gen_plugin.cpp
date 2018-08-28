@@ -89,18 +89,24 @@ using namespace eosio::chain;
 
 struct txn_test_gen_plugin_impl {
    static void push_next_transaction(const std::shared_ptr<std::vector<signed_transaction>>& trxs, size_t index, const std::function<void(const fc::exception_ptr&)>& next ) {
+      ilog("push_next_transaction  index ${p} ", ("p", index));
       chain_plugin& cp = app().get_plugin<chain_plugin>();
       cp.accept_transaction( packed_transaction(trxs->at(index)), [=](const fc::static_variant<fc::exception_ptr, transaction_trace_ptr>& result){
          if (result.contains<fc::exception_ptr>()) {
             next(result.get<fc::exception_ptr>());
          } else {
-            if (index + 1 < trxs->size()) {
-               push_next_transaction(trxs, index + 1, next);
-            } else {
-               next(nullptr);
-            }
+//            if (index + 1 < trxs->size()) {
+//               push_next_transaction(trxs, index + 1, next);
+//            } else {
+//               next(nullptr);
+//            }
          }
       });
+      if (index + 1 < trxs->size()) {
+         push_next_transaction(trxs, index + 1, next);
+      } else {
+         next(nullptr);
+      }
    }
 
    void push_transactions( std::vector<signed_transaction>&& trxs, const std::function<void(fc::exception_ptr)>& next ) {
