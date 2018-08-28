@@ -413,9 +413,9 @@ createfinished:
          next(e.dynamic_copy_exception());
       }
       unsigned trans_count=trxs.size();
-      ilog("start push_transactions  ${p}", ("p", trans_count));
+     // ilog("start push_transactions  ${p}", ("p", trans_count));
       push_transactions(std::move(trxs), next);
-      ilog("finish push_transactions  ${p}", ("p", trans_count));
+    //  ilog("finish push_transactions  ${p}", ("p", trans_count));
    }
 
    void stop_generation() {
