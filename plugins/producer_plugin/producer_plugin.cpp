@@ -398,10 +398,14 @@ class producer_plugin_impl : public std::enable_shared_from_this<producer_plugin
       void on_incoming_transaction_async(const packed_transaction_ptr& trx, bool persist_until_expired, next_function<transaction_trace_ptr> next) {
 
 	    // elog( "producer_plugin_impl on_incoming_transaction_async" );
-         CxpTask task = boost::bind(&producer_plugin_impl::on_thread_fun,this,trx,persist_until_expired,next);
-         threadpool.AddNewTask(task);
-	     return ;
-         boost::thread th { [this, trx, persist_until_expired, next](){
+		
+         if(threadpool.get_thread_count()>0)
+          {
+              CxpTask task = boost::bind(&producer_plugin_impl::on_thread_fun,this,trx,persist_until_expired,next);
+              threadpool.AddNewTask(task);
+              return ;
+          }
+       //  boost::thread th { [this, trx, persist_until_expired, next](){
          chain::controller& chain = app().get_plugin<chain_plugin>().chain();
          if (!chain.pending_block_state()) {
             _pending_incoming_transactions.emplace_back(trx, persist_until_expired, next);
@@ -461,8 +465,8 @@ class producer_plugin_impl : public std::enable_shared_from_this<producer_plugin
             raise(SIGUSR1);
          } CATCH_AND_CALL(send_response);
            // hc test
-           }};
-           th.detach();
+          // }};
+          // th.detach();
       }
 
 

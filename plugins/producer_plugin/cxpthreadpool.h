@@ -103,7 +103,8 @@ public:
         stop();
 
     }
-
+    
+	
     //停止线程池
     void stop()
     {
@@ -161,7 +162,8 @@ public:
 
         // std::cout<<"AddNewTask taskQueue size="<<m_taskQueue.get_size()<<std::endl;
     }
-
+    
+	int get_thread_count(){return m_threadNum;}
 
 };
 
