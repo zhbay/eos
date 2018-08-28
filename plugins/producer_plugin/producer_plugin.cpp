@@ -332,7 +332,7 @@ class producer_plugin_impl : public std::enable_shared_from_this<producer_plugin
 	  
 	    void on_thread_fun(const packed_transaction_ptr& trx, bool persist_until_expired, next_function<transaction_trace_ptr> next)
       {
-          elog( "producer_plugin_impl on_thread_fun start" );
+         // elog( "producer_plugin_impl on_thread_fun start" );
 
           chain::controller& chain = app().get_plugin<chain_plugin>().chain();
           //chain::controller& producer_plug=app().get_plugin<producer_plug>().;
@@ -371,7 +371,7 @@ class producer_plugin_impl : public std::enable_shared_from_this<producer_plugin
              auto trace = chain.push_transaction(std::make_shared<transaction_metadata>(*trx), deadline);
              if (trace->except) {
                 if (failure_is_subjective(*trace->except, deadline_is_subjective)) {
-                     elog( "producer_plugin_impl on_thread_fun deadline_is_subjective" );
+                    // elog( "producer_plugin_impl on_thread_fun deadline_is_subjective" );
                   // _pending_incoming_transactions.emplace_back(trx, persist_until_expired, next);
                 } else {
                    auto e_ptr = trace->except->dynamic_copy_exception();
@@ -379,7 +379,7 @@ class producer_plugin_impl : public std::enable_shared_from_this<producer_plugin
                 }
              } else {
                 if (persist_until_expired) {
-                    elog( "producer_plugin_impl on_thread_fun persist_until_expired" );
+                    //elog( "producer_plugin_impl on_thread_fun persist_until_expired" );
                    // if this trx didnt fail/soft-fail and the persist flag is set, store its ID so that we can
                    // ensure its applied to all future speculative blocks as well.
                   // _persistent_transactions.insert(transaction_id_with_expiry{trx->id(), trx->expiration()});
@@ -392,12 +392,12 @@ class producer_plugin_impl : public std::enable_shared_from_this<producer_plugin
           } catch ( boost::interprocess::bad_alloc& ) {
              raise(SIGUSR1);
           } CATCH_AND_CALL(send_response);
-        elog( "producer_plugin_impl on_thread_fun end" );
+       // elog( "producer_plugin_impl on_thread_fun end" );
       }
 
       void on_incoming_transaction_async(const packed_transaction_ptr& trx, bool persist_until_expired, next_function<transaction_trace_ptr> next) {
 
-	     elog( "producer_plugin_impl on_incoming_transaction_async" );
+	    // elog( "producer_plugin_impl on_incoming_transaction_async" );
          CxpTask task = boost::bind(&producer_plugin_impl::on_thread_fun,this,trx,persist_until_expired,next);
          threadpool.AddNewTask(task);
 	     return ;

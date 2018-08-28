@@ -65,7 +65,7 @@ private:
                 boost::unique_lock<boost::mutex> lock(m_mutex);
                 if(is_suspend)
                 {
-                    std::cout << "run is_suspend m_cond.wait"<<m_run_thread<<std::endl;
+                   // std::cout << "run is_suspend m_cond.wait"<<m_run_thread<<std::endl;
                     m_cond.wait(lock);
                 }
                 //如果队列中没有任务，则等待互斥锁
@@ -75,15 +75,15 @@ private:
                     lock.unlock();
 
                     m_run_thread++;
-                    std::cout << "run m_run_thread1:"<<m_run_thread<<std::endl;
+                   // std::cout << "run m_run_thread1:"<<m_run_thread<<std::endl;
                     task();
                     m_run_thread--;
 
-                    std::cout << "run m_run_thread2:"<<m_run_thread<<std::endl;
+                   // std::cout << "run m_run_thread2:"<<m_run_thread<<std::endl;
                 }
                  else
                 {
-                    std::cout << "run size==0 m_cond.wait"<<m_run_thread<<std::endl;
+                   // std::cout << "run size==0 m_cond.wait"<<m_run_thread<<std::endl;
                     m_cond.wait(lock);
                 }
 
@@ -129,7 +129,7 @@ public:
     {
         is_suspend=true;
 
-        std::cout << "pause start m_run_thread:"<<m_run_thread<<std::endl;
+        //std::cout << "pause start m_run_thread:"<<m_run_thread<<std::endl;
 
         while(m_run_thread>0)
         {
@@ -138,7 +138,7 @@ public:
 
 
 
-        std::cout << "pause  end m_run_thread:"<<m_run_thread<<std::endl;
+       // std::cout << "pause  end m_run_thread:"<<m_run_thread<<std::endl;
     }
 
     void resume()
@@ -159,7 +159,7 @@ public:
         if(!is_suspend&& is_run)
             m_cond.notify_one();
 
-         std::cout<<"AddNewTask taskQueue size="<<m_taskQueue.get_size()<<std::endl;
+        // std::cout<<"AddNewTask taskQueue size="<<m_taskQueue.get_size()<<std::endl;
     }
 
 
