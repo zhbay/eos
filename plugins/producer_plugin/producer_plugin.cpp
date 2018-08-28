@@ -740,11 +740,12 @@ void producer_plugin::plugin_startup()
    }
 
    my->schedule_production_loop();
-
+   threadpool.init();
    ilog("producer plugin:  plugin_startup() end");
 } FC_CAPTURE_AND_RETHROW() }
 
 void producer_plugin::plugin_shutdown() {
+   threadpool.stop();
    try {
       my->_timer.cancel();
    } catch(fc::exception& e) {
