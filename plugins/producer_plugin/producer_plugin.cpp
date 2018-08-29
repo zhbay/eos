@@ -337,6 +337,8 @@ class producer_plugin_impl : public std::enable_shared_from_this<producer_plugin
           chain::controller& chain = app().get_plugin<chain_plugin>().chain();
           //chain::controller& producer_plug=app().get_plugin<producer_plug>().;
 
+		  (std::make_shared<transaction_metadata>(*trx))->trx.set_reference_block(chain.head_block_id());
+		  
           auto block_time = chain.pending_block_time();
 
 

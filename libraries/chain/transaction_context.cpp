@@ -260,9 +260,9 @@ namespace eosio { namespace chain {
       }
 
       validate_cpu_usage_to_bill( billed_cpu_time_us );
-
-      rl.add_transaction_usage( bill_to_accounts, static_cast<uint64_t>(billed_cpu_time_us), net_usage,
-                                block_timestamp_type(control.pending_block_time()).slot ); // Should never fail
+      //cxp
+      //rl.add_transaction_usage( bill_to_accounts, static_cast<uint64_t>(billed_cpu_time_us), net_usage,
+      //                          block_timestamp_type(control.pending_block_time()).slot ); // Should never fail
    }
 
    void transaction_context::squash() {
@@ -272,7 +272,7 @@ namespace eosio { namespace chain {
    void transaction_context::undo() {
       undo_session.undo();
    }
-
+   //cxp
    void transaction_context::check_net_usage()const {
 	   return ;
       if( BOOST_UNLIKELY(net_usage > eager_net_limit) ) {
@@ -291,7 +291,7 @@ namespace eosio { namespace chain {
          }
       }
    }
-
+   //cxp
    void transaction_context::checktime()const {
 	   return ;
       auto now = fc::time_point::now();
@@ -339,8 +339,9 @@ namespace eosio { namespace chain {
          deadline_exception_code = deadline_exception::code_value;
       }
    }
-
+   //cxp
    void transaction_context::validate_cpu_usage_to_bill( int64_t billed_us, bool check_minimum )const {
+	  return ;
       if( check_minimum ) {
          const auto& cfg = control.get_global_properties().configuration;
          EOS_ASSERT( billed_us >= cfg.min_transaction_cpu_usage, transaction_exception,
