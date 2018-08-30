@@ -86,8 +86,8 @@ private:
                     m_read_queue=(++m_read_queue)%2;
                 }
 
-                    //std::cout << "run m_read_queue:"<<m_read_queue<<"queue size:"<<m_taskQueue[m_read_queue].get_size()<<std::endl;
-                    //std::cout << "run m_write_queue:"<<(m_read_queue+1)%2<<"queue size:"<<m_taskQueue[(m_read_queue+1)%2].get_size()<<std::endl;
+                    std::cout << "run m_read_queue:"<<m_read_queue<<"queue size:"<<m_taskQueue[m_read_queue].get_size()<<std::endl;
+                    std::cout << "run m_write_queue:"<<(m_read_queue+1)%2<<"queue size:"<<m_taskQueue[(m_read_queue+1)%2].get_size()<<std::endl;
                     CxpTask task = m_taskQueue[m_read_queue].pop_Task();
                     m_run_thread++;
                     lock.unlock();
@@ -171,6 +171,17 @@ public:
     }
 
     int get_thread_count(){return m_threadNum;}
+
+    uint64_t get_readqueue_size()
+    {
+        return m_taskQueue[m_read_queue].get_size();
+    }
+
+
+    uint64_t get_writequeue_size()
+    {
+        return m_taskQueue[(m_read_queue+1)%2].get_size();
+    }
 
 
 };
