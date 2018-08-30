@@ -37,14 +37,20 @@ public:
 class CxpThreadPool : public boost::noncopyable
 {
 public:
-    CxpThreadPool(int num):m_threadNum(num),is_run(false),is_suspend(true),m_run_thread(0){}
+    CxpThreadPool(int num):m_threadNum(num),is_run(false),is_suspend(true),m_run_thread(0),m_read_queue(0)
+    {
+
+    }
 private:
     //任务队列
 
     boost::mutex m_mutex;//互斥锁
 
+    boost::mutex m_switch_queue_mutex;
+
     boost::condition_variable_any m_cond;//条件变量
-    CxpTaskQueue m_taskQueue;
+    CxpTaskQueue m_taskQueue[2];
+    std::atomic<uint32_t> m_read_queue;
     //线程组
     boost::thread_group m_threadGroup;
     int m_threadNum;
@@ -69,27 +75,24 @@ private:
                     m_cond.wait(lock);
                 }
                 //如果队列中没有任务，则等待互斥锁
-                if(m_taskQueue.get_size()>0)
+                if(m_taskQueue[0].get_size()==0 && m_taskQueue[1].get_size()==0)
                 {
-                    CxpTask task = m_taskQueue.pop_Task();
-
-                     m_run_thread++;
-
-                    lock.unlock();
-
-
-                    std::cout << "run m_run_thread1:"<<m_run_thread<<std::endl;
-                    task();
-                    m_run_thread--;
-
-                    std::cout << "run m_run_thread2:"<<m_run_thread<<std::endl;
-                }
-                 else
-                {
-                    std::cout << "run size==0 m_cond.wait"<<m_run_thread<<std::endl;
                     m_cond.wait(lock);
                 }
+                //如果读取队列中没有任务，则切换队列
+                if(m_taskQueue[m_read_queue].get_size()==0)
+                {
+                    boost::unique_lock<boost::mutex> lock(m_switch_queue_mutex);
+                    m_read_queue=(++m_read_queue)%2;
+                }
 
+                    //std::cout << "run m_read_queue:"<<m_read_queue<<"queue size:"<<m_taskQueue[m_read_queue].get_size()<<std::endl;
+                    //std::cout << "run m_write_queue:"<<(m_read_queue+1)%2<<"queue size:"<<m_taskQueue[(m_read_queue+1)%2].get_size()<<std::endl;
+                    CxpTask task = m_taskQueue[m_read_queue].pop_Task();
+                    m_run_thread++;
+                    lock.unlock();
+                    task();
+                    m_run_thread--;
 
             }
 
@@ -148,22 +151,23 @@ public:
     void resume()
     {
         is_suspend=false;
-        boost::unique_lock<boost::mutex> lock(m_mutex);
-        if(m_taskQueue.get_size()>=m_threadNum)
+
+        if(m_taskQueue[0].get_size()>0 || m_taskQueue[1].get_size()>0)
             m_cond.notify_all();
-        else if(m_taskQueue.get_size()>0)
-            m_cond.notify_one();
+
     }
 
     //添加任务
     void AddNewTask(const CxpTask& task)
     {
-        boost::unique_lock<boost::mutex> lock(m_mutex);
-        m_taskQueue.push_Task(task);
+
+        boost::unique_lock<boost::mutex> lock(m_switch_queue_mutex);
+        m_taskQueue[(m_read_queue+1)%2].push_Task(task);
+        //std::cout << "AddNewTask m_write_queue:"<<(m_read_queue+1)%2<<"queue size:"<<m_taskQueue[(m_read_queue+1)%2].get_size()<<std::endl;
+        lock.unlock();
+
         if(!is_suspend&& is_run)
             m_cond.notify_one();
-
-         std::cout<<"AddNewTask taskQueue size="<<m_taskQueue.get_size()<<std::endl;
     }
 
     int get_thread_count(){return m_threadNum;}
