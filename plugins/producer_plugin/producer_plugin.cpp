@@ -983,8 +983,8 @@ producer_plugin_impl::start_block_result producer_plugin_impl::start_block(bool 
 
       chain.abort_block();
       chain.start_block(block_time, blocks_to_confirm);
-	  threadpool.resume();
-      ilog("start_block threadpool.resume()${t}", ("t", fc::time_point::now())); // for testing _produce_time_offset_us
+
+
    } FC_LOG_AND_DROP();
 
    const auto& pbs = chain.pending_block_state();
@@ -1266,6 +1266,12 @@ void producer_plugin_impl::produce_block() {
       return signature_provider_itr->second(d);
    } );
 
+   chain.switchpending();
+   schedule_production_loop();
+
+   threadpool.resume();
+   ilog("start_block threadpool.resume()${t}", ("t", fc::time_point::now())); // for testing _produce_time_offset_us
+
    chain.commit_block();
    auto hbt = chain.head_block_time();
    //idump((fc::time_point::now() - hbt));
@@ -1273,10 +1279,12 @@ void producer_plugin_impl::produce_block() {
    block_state_ptr new_bs = chain.head_block_state();
    _producer_watermarks[new_bs->header.producer] = chain.head_block_num();
 
-  ilog("Produced block ${id}... #${n} @ ${t} signed by ${p} [trxs: ${count}, lib: ${lib}, confirmed: ${confs}] readqueue:${readqueue},writequeue:${writequeue}\n",
+
+  int pindingindex=(chain.get_panding_index()+1)%2;
+   ilog("Produced block ${id}... #${n} @ ${t} signed by ${p} [trxs: ${count}, lib: ${lib}, confirmed: ${confs}] pandingindex:${pandingindex},readqueue:${readqueue},writequeue:${writequeue}\n",
         ("p",new_bs->header.producer)("id",fc::variant(new_bs->id).as_string().substr(0,16))
         ("n",new_bs->block_num)("t",new_bs->header.timestamp)
-        ("count",new_bs->block->transactions.size())("lib",chain.last_irreversible_block_num())("confs", new_bs->header.confirmed)("readqueue",threadpool.get_readqueue_size())("writequeue",threadpool.get_writequeue_size()));
+        ("count",new_bs->block->transactions.size())("lib",chain.last_irreversible_block_num())("confs", new_bs->header.confirmed)("pandingindex",pindingindex)("readqueue",threadpool.get_readqueue_size())("writequeue",threadpool.get_writequeue_size()));
 
 
 }
