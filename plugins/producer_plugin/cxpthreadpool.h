@@ -69,16 +69,17 @@ private:
             //加上互斥锁
             {
                 boost::unique_lock<boost::mutex> lock(m_mutex);
+				 //如果队列中没有任务，则等待互斥锁
+                if(m_taskQueue[0].get_size()==0 && m_taskQueue[1].get_size()==0)
+                {
+                    m_cond.wait(lock);
+                }
                 if(is_suspend)
                 {
                    // std::cout << "run is_suspend m_cond.wait"<<m_run_thread<<std::endl;
                     m_cond.wait(lock);
                 }
-                //如果队列中没有任务，则等待互斥锁
-                if(m_taskQueue[0].get_size()==0 && m_taskQueue[1].get_size()==0)
-                {
-                    m_cond.wait(lock);
-                }
+               
                 //如果读取队列中没有任务，则切换队列
                 if(m_taskQueue[m_read_queue].get_size()==0)
                 {
