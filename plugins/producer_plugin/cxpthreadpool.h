@@ -71,7 +71,7 @@ private:
                 boost::unique_lock<boost::mutex> lock(m_mutex);
                 if(is_suspend)
                 {
-                    std::cout << "run is_suspend m_cond.wait"<<m_run_thread<<std::endl;
+                   // std::cout << "run is_suspend m_cond.wait"<<m_run_thread<<std::endl;
                     m_cond.wait(lock);
                 }
                 //如果队列中没有任务，则等待互斥锁
@@ -136,7 +136,7 @@ public:
         is_suspend=true;
 
         boost::unique_lock<boost::mutex> lock(m_mutex);
-        std::cout << "pause start m_run_thread:"<<m_run_thread<<std::endl;
+       // std::cout << "pause start m_run_thread:"<<m_run_thread<<std::endl;
 
         while(m_run_thread>0)
         {
@@ -145,7 +145,7 @@ public:
 
 
 
-        std::cout << "pause  end m_run_thread:"<<m_run_thread<<std::endl;
+       // std::cout << "pause  end m_run_thread:"<<m_run_thread<<std::endl;
     }
 
     void resume()

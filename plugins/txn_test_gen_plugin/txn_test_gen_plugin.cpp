@@ -95,18 +95,18 @@ struct txn_test_gen_plugin_impl {
          if (result.contains<fc::exception_ptr>()) {
             next(result.get<fc::exception_ptr>());
          } else {
-//            if (index + 1 < trxs->size()) {
-//               push_next_transaction(trxs, index + 1, next);
-//            } else {
-//               next(nullptr);
-//            }
+            if (index + 1 < trxs->size()) {
+               push_next_transaction(trxs, index + 1, next);
+            } else {
+               next(nullptr);
+            }
          }
       });
-      if (index + 1 < trxs->size()) {
-         push_next_transaction(trxs, index + 1, next);
-      } else {
-         next(nullptr);
-      }
+//      if (index + 1 < trxs->size()) {
+//         push_next_transaction(trxs, index + 1, next);
+//      } else {
+//         next(nullptr);
+//      }
    }
 
    void push_transactions( std::vector<signed_transaction>&& trxs, const std::function<void(fc::exception_ptr)>& next ) {
