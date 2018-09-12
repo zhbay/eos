@@ -554,7 +554,7 @@ struct controller_impl {
       try {
          if (add_to_fork_db) {
             getfinalizepending()->_pending_block_state->validated = true;
-            block_id_type id=getfinalizepending()->_pending_block_state->header.id();
+            
             auto new_bsp = fork_db.add(getfinalizepending()->_pending_block_state);
             emit(self.accepted_block_header, getfinalizepending()->_pending_block_state);
             head = fork_db.head();
