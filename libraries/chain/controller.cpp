@@ -82,10 +82,72 @@ struct controller_impl {
         return pending[(pendingindex+1)%2];
    }
 
+
    void switchpending()
    {
+       optional<pending_state>& finalizepending=pending[pendingindex];
        pendingindex=(pendingindex+1)%2;
        pending[pendingindex].reset();
+
+       fc::time_point now = fc::time_point::now();
+       fc::time_point base = std::max<fc::time_point>(now, finalizepending->_pending_block_state->header.timestamp);
+       int64_t min_time_to_next_block = (config::block_interval_us) - (base.time_since_epoch().count() % (config::block_interval_us) );
+       fc::time_point block_time = base + fc::microseconds(min_time_to_next_block);
+
+       //optional<pending_state> newpending;
+       //newpending.reset();
+       //EOS_ASSERT( !newpending, block_validate_exception, "newpending block is not available" );
+       //newpending = db.start_undo_session(true);
+       block_state_ptr new_block_state=std::make_shared<block_state>( *head, block_time );
+       new_block_state->set_confirmed(0);
+
+       finalizepending->_pending_block_state->block_num=new_block_state->block_num;
+       finalizepending->_pending_block_state->header.previous=new_block_state->header.previous;
+       uint32_t last_block_num=finalizepending->_pending_block_state->header.num_from_id(finalizepending->_pending_block_state->header.previous);
+       finalizepending->_pending_block_state->block->previous=new_block_state->block->previous;
+       finalizepending->_pending_block_state->block->confirmed=new_block_state->block->confirmed;
+
+
+       finalizepending->_pending_block_state->blockroot_merkle.append(finalizepending->_pending_block_state->id);
+       finalizepending->_pending_block_state->dpos_proposed_irreversible_blocknum=new_block_state->dpos_proposed_irreversible_blocknum;
+       finalizepending->_pending_block_state->bft_irreversible_blocknum=new_block_state->bft_irreversible_blocknum;
+       finalizepending->_pending_block_state->dpos_irreversible_blocknum=new_block_state->dpos_irreversible_blocknum;
+
+       //finalizepending->_pending_block_state = std::make_shared<block_state>( *head, block_time ); // promotes pending schedule (if any) to active
+
+
+
+       finalizepending->_pending_block_state->in_current_chain = true;
+
+       //finalizepending->_pending_block_state->id=finalizepending->_pending_block_state->header.id();
+       //create_block_summary(finalizepending->_pending_block_state->id);
+
+
+//       uint64_t tsize=getfinalizepending()->_pending_block_state->trxs.size();
+//       newpending->_pending_block_state->trxs.reserve(tsize);
+//       newpending->_pending_block_state->trxs.assign(getfinalizepending()->_pending_block_state->trxs.begin(),getfinalizepending()->_pending_block_state->trxs.end());
+
+//       tsize=getfinalizepending()->_actions.size();
+//       newpending->_actions.reserve(tsize);
+//       newpending->_actions.assign(getfinalizepending()->_actions.begin(),getfinalizepending()->_actions.end());
+
+//       tsize=getfinalizepending()->_pending_block_state->block->transactions.size();
+//       newpending->_pending_block_state->block->transactions.reserve(tsize);
+//       newpending->_pending_block_state->block->transactions.assign(getfinalizepending()->_pending_block_state->block->transactions.begin(),getfinalizepending()->_pending_block_state->block->transactions.end());
+//       //set_action_merkle();
+//       vector<digest_type> action_digests;
+//       action_digests.reserve( newpending->_actions.size() );
+//       for( const auto& a : newpending->_actions )
+//          action_digests.emplace_back( a.digest() );
+//       newpending->_pending_block_state->header.action_mroot = merkle( move(action_digests) );
+
+//       //set_trx_merkle();
+//       vector<digest_type> trx_digests;
+//       const auto& trxs = newpending->_pending_block_state->block->transactions;
+//       trx_digests.reserve( trxs.size() );
+//       for( const auto& a : trxs )
+//          trx_digests.emplace_back( a.digest() );
+//       newpending->_pending_block_state->header.transaction_mroot = merkle( move(trx_digests) );
    }
 
    void pop_block() {
@@ -435,9 +497,64 @@ struct controller_impl {
          //getfinalizepending().reset();
       });
 
+//      fc::time_point now = fc::time_point::now();
+//      fc::time_point base = std::max<fc::time_point>(now, head->header.timestamp);
+//      int64_t min_time_to_next_block = (config::block_interval_us) - (base.time_since_epoch().count() % (config::block_interval_us) );
+//      fc::time_point block_time = base + fc::microseconds(min_time_to_next_block);
+
+//      optional<pending_state> newpending;
+//      newpending.reset();
+//      EOS_ASSERT( !newpending, block_validate_exception, "newpending block is not available" );
+//      newpending = db.start_undo_session(true);
+//      newpending->_pending_block_state = std::make_shared<block_state>( *head, block_time ); // promotes pending schedule (if any) to active
+//      newpending->_pending_block_state->id=newpending->_pending_block_state->header.id();
+//      create_block_summary(newpending->_pending_block_state->id);
+//      newpending->_pending_block_state->in_current_chain = true;
+//      newpending->_pending_block_state->set_confirmed(getfinalizepending()->_pending_block_state->header.confirmed);
+
+//      uint64_t tsize=getfinalizepending()->_pending_block_state->trxs.size();
+//      newpending->_pending_block_state->trxs.reserve(tsize);
+//      newpending->_pending_block_state->trxs.assign(getfinalizepending()->_pending_block_state->trxs.begin(),getfinalizepending()->_pending_block_state->trxs.end());
+
+//      tsize=getfinalizepending()->_actions.size();
+//      newpending->_actions.reserve(tsize);
+//      newpending->_actions.assign(getfinalizepending()->_actions.begin(),getfinalizepending()->_actions.end());
+
+//      tsize=getfinalizepending()->_pending_block_state->block->transactions.size();
+//      newpending->_pending_block_state->block->transactions.reserve(tsize);
+//      newpending->_pending_block_state->block->transactions.assign(getfinalizepending()->_pending_block_state->block->transactions.begin(),getfinalizepending()->_pending_block_state->block->transactions.end());
+//      //set_action_merkle();
+//      vector<digest_type> action_digests;
+//      action_digests.reserve( newpending->_actions.size() );
+//      for( const auto& a : newpending->_actions )
+//         action_digests.emplace_back( a.digest() );
+//      newpending->_pending_block_state->header.action_mroot = merkle( move(action_digests) );
+
+//      //set_trx_merkle();
+//      vector<digest_type> trx_digests;
+//      const auto& trxs = newpending->_pending_block_state->block->transactions;
+//      trx_digests.reserve( trxs.size() );
+//      for( const auto& a : trxs )
+//         trx_digests.emplace_back( a.digest() );
+//      newpending->_pending_block_state->header.transaction_mroot = merkle( move(trx_digests) );
+
+
+//      auto p = newpending->_pending_block_state;
+//      sign_block( [&]( const auto& ){ return p->block->producer_signature; }, false ); //trust );
+
+
+
+//      block_state_ptr new_block_state=std::make_shared<block_state>( *head,block_time);
+//      getfinalizepending()->_pending_block_state->block_num=new_block_state->block_num;
+//      getfinalizepending()->_pending_block_state->header.previous=new_block_state->header.previous;
+//      getfinalizepending()->_pending_block_state->id=getfinalizepending()->_pending_block_state->header.id();
+//      create_block_summary(getfinalizepending()->_pending_block_state->id);
+
+
       try {
          if (add_to_fork_db) {
             getfinalizepending()->_pending_block_state->validated = true;
+            block_id_type id=getfinalizepending()->_pending_block_state->header.id();
             auto new_bsp = fork_db.add(getfinalizepending()->_pending_block_state);
             emit(self.accepted_block_header, getfinalizepending()->_pending_block_state);
             head = fork_db.head();
@@ -678,6 +795,8 @@ struct controller_impl {
    {
       EOS_ASSERT(deadline != fc::time_point(), transaction_exception, "deadline cannot be uninitialized");
 
+                                        
+
       transaction_trace_ptr trace;
       try {
          transaction_context trx_context(self, trx->trx, trx->id);
@@ -692,9 +811,11 @@ struct controller_impl {
                trx_context.init_for_implicit_trx();
                trx_context.can_subjectively_fail = false;
             } else {
+                                         
                trx_context.init_for_input_trx( trx->packed_trx.get_unprunable_size(),
                                                trx->packed_trx.get_prunable_size(),
                                                trx->trx.signatures.size());
+                                         
             }
 
             if( trx_context.can_subjectively_fail && getpending()->_block_status == controller::block_status::incomplete ) {
@@ -703,6 +824,8 @@ struct controller_impl {
 
 
             trx_context.delay = fc::seconds(trx->trx.delay_sec);
+
+                                          
 
             if( !self.skip_auth_check() && !implicit ) {
                authorization.check_authorization(
@@ -716,7 +839,9 @@ struct controller_impl {
                        false
                );
             }
+                                          
             trx_context.exec();
+                                          
             trx_context.finalize(); // Automatically rounds up network and CPU usage in trace and bills payers if successful
 
             auto restore = make_block_restore_point();
@@ -727,18 +852,21 @@ struct controller_impl {
                                                     : transaction_receipt::delayed;
                trace->receipt = push_receipt(trx->packed_trx, s, trx_context.billed_cpu_time_us, trace->net_usage);
                getpending()->_pending_block_state->trxs.emplace_back(trx);
+                                          
             } else {
                transaction_receipt_header r;
                r.status = transaction_receipt::executed;
                r.cpu_usage_us = trx_context.billed_cpu_time_us;
                r.net_usage_words = trace->net_usage / 8;
                trace->receipt = r;
+                                          
             }
 
             fc::move_append(getpending()->_actions, move(trx_context.executed));
 
             // call the accept signal but only once for this transaction
             if (!trx->accepted) {
+                                          
                emit( self.accepted_transaction, trx);
                trx->accepted = true;
             }
@@ -749,6 +877,7 @@ struct controller_impl {
             if ( read_mode != db_read_mode::SPECULATIVE && getpending()->_block_status == controller::block_status::incomplete ) {
                //this may happen automatically in destructor, but I prefere make it more explicit
                trx_context.undo();
+                                          
             } else {
                restore.cancel();
                trx_context.squash();
@@ -775,18 +904,29 @@ struct controller_impl {
    void start_block( block_timestamp_type when, uint16_t confirm_block_count, controller::block_status s ) {
       EOS_ASSERT( !getpending(), block_validate_exception, "pending block is not available" );
 
-      EOS_ASSERT( db.revision() == head->block_num, database_exception, "db revision is not on par with head block", 
-                ("db.revision()", db.revision())("controller_head_block", head->block_num)("fork_db_head_block", fork_db.head()->block_num) );
+      //EOS_ASSERT( db.revision() == head->block_num, database_exception, "db revision is not on par with head block",
+      //          ("db.revision()", db.revision())("controller_head_block", head->block_num)("fork_db_head_block", fork_db.head()->block_num) );
 
       auto guard_pending = fc::make_scoped_exit([this](){
          getpending().reset();
       });
 
+      if(head->block_num>1)
+      {
+        fc::time_point now = fc::time_point::now();
+        fc::time_point base = std::max<fc::time_point>(now, getfinalizepending()->_pending_block_state->header.timestamp);
+        int64_t min_time_to_next_block = (config::block_interval_us) - (base.time_since_epoch().count() % (config::block_interval_us) );
+        fc::time_point block_time = base + fc::microseconds(min_time_to_next_block);
+        when=block_time;
+
+      }
       pending[pendingindex] = db.start_undo_session(true);
 
       getpending()->_block_status = s;
+      //block_state_ptr test_block_state=std::make_shared<block_state>( *head, when );
 
       getpending()->_pending_block_state = std::make_shared<block_state>( *head, when ); // promotes pending schedule (if any) to active
+
       getpending()->_pending_block_state->in_current_chain = true;
 
       getpending()->_pending_block_state->set_confirmed(confirm_block_count);
@@ -843,7 +983,7 @@ struct controller_impl {
 
 
    void sign_block( const std::function<signature_type( const digest_type& )>& signer_callback, bool trust  ) {
-      auto p = getpending()->_pending_block_state;
+      auto p = getfinalizepending()->_pending_block_state;
 
       p->sign( signer_callback, false); //trust );
 
@@ -857,12 +997,12 @@ struct controller_impl {
          start_block( b->timestamp, b->confirmed, s );
 
        //hc test
-       std::vector<boost::thread> threads;
+       //std::vector<boost::thread> threads;
        for( const auto& receipt : b->transactions ) {
             //hc test
-            threads.emplace_back([&]{
+           // threads.emplace_back([&]{
 
-		        transaction_trace_ptr trace;
+            transaction_trace_ptr trace;
             auto num_pending_receipts = getpending()->_pending_block_state->block->transactions.size();
             if( receipt.trx.contains<packed_transaction>() ) {
                auto& pt = receipt.trx.get<packed_transaction>();
@@ -894,14 +1034,14 @@ struct controller_impl {
                         block_validate_exception, "receipt does not match",
                         ("producer_receipt", receipt)("validator_receipt", getpending()->_pending_block_state->block->transactions.back()) );
               //hc test
-              });
+              //});
          }
 
 				 //hc test
-         for(boost::thread & thread : threads) {
-              thread.join();
-          }
-
+//         for(boost::thread & thread : threads) {
+//              thread.join();
+//          }
+         switchpending();
          finalize_block();
          sign_block( [&]( const auto& ){ return b->producer_signature; }, false ); //trust );
 
@@ -1029,27 +1169,27 @@ struct controller_impl {
 
    void set_action_merkle() {
       vector<digest_type> action_digests;
-      action_digests.reserve( getpending()->_actions.size() );
-      for( const auto& a : getpending()->_actions )
+      action_digests.reserve( getfinalizepending()->_actions.size() );
+      for( const auto& a : getfinalizepending()->_actions )
          action_digests.emplace_back( a.digest() );
 
-      getpending()->_pending_block_state->header.action_mroot = merkle( move(action_digests) );
+      getfinalizepending()->_pending_block_state->header.action_mroot = merkle( move(action_digests) );
    }
 
    void set_trx_merkle() {
       vector<digest_type> trx_digests;
-      const auto& trxs = getpending()->_pending_block_state->block->transactions;
+      const auto& trxs = getfinalizepending()->_pending_block_state->block->transactions;
       trx_digests.reserve( trxs.size() );
       for( const auto& a : trxs )
          trx_digests.emplace_back( a.digest() );
 
-      getpending()->_pending_block_state->header.transaction_mroot = merkle( move(trx_digests) );
+      getfinalizepending()->_pending_block_state->header.transaction_mroot = merkle( move(trx_digests) );
    }
 
 
    void finalize_block()
    {
-      EOS_ASSERT(getpending(), block_validate_exception, "it is not valid to finalize when there is no pending block");
+      EOS_ASSERT(getfinalizepending(), block_validate_exception, "it is not valid to finalize when there is no pending block");
       try {
 
 
@@ -1076,17 +1216,18 @@ struct controller_impl {
          { CPU_TARGET, chain_config.max_block_cpu_usage, config::block_cpu_usage_average_window_ms / config::block_interval_ms, max_virtual_mult, {99, 100}, {1000, 999}},
          {EOS_PERCENT(chain_config.max_block_net_usage, chain_config.target_block_net_usage_pct), chain_config.max_block_net_usage, config::block_size_average_window_ms / config::block_interval_ms, max_virtual_mult, {99, 100}, {1000, 999}}
       );
-      resource_limits.process_block_usage(getpending()->_pending_block_state->block_num);
+      resource_limits.process_block_usage(getfinalizepending()->_pending_block_state->block_num);
 
       set_action_merkle();
       set_trx_merkle();
 
-      auto p = getpending()->_pending_block_state;
+      auto p = getfinalizepending()->_pending_block_state;
       p->id = p->header.id();
 
       create_block_summary(p->id);
 
    } FC_CAPTURE_AND_RETHROW() }
+
 
    void update_producers_authority() {
       const auto& producers = getpending()->_pending_block_state->active_schedule.producers;

@@ -187,5 +187,5 @@ public:
 };
 
 
-static uint64_t loopcount=0;
+
 CxpThreadPool threadpool(1);

@@ -745,8 +745,10 @@ void producer_plugin::plugin_startup()
       }
    }
 
-   my->schedule_production_loop();
    threadpool.init();
+
+   my->schedule_production_loop();
+
    ilog("producer plugin:  plugin_startup() end");
 } FC_CAPTURE_AND_RETHROW() }
 
@@ -981,6 +983,7 @@ producer_plugin_impl::start_block_result producer_plugin_impl::start_block(bool 
          }
       }
 
+      elog("start_block");
       chain.abort_block();
       chain.start_block(block_time, blocks_to_confirm);
 
@@ -1211,7 +1214,7 @@ void producer_plugin_impl::schedule_production_loop() {
 
 bool producer_plugin_impl::maybe_produce_block() {
    auto reschedule = fc::make_scoped_exit([this]{
-      schedule_production_loop();
+      //schedule_production_loop();
    });
 
    try {
@@ -1259,18 +1262,19 @@ void producer_plugin_impl::produce_block() {
 
    EOS_ASSERT(signature_provider_itr != _signature_providers.end(), producer_priv_key_not_found, "Attempting to produce a block for which we don't have the private key");
 
+   elog("switchpending");
+   chain.switchpending();
+   schedule_production_loop();
+
+   threadpool.resume();
+   ilog("produce_block  threadpool.resume() ${t}", ("t", fc::time_point::now())); // for testing _produce_time_offset_us
+
    //idump( (fc::time_point::now() - chain.pending_block_time()) );
    chain.finalize_block();
    chain.sign_block( [&]( const digest_type& d ) {
       auto debug_logger = maybe_make_debug_time_logger();
       return signature_provider_itr->second(d);
    } );
-
-   chain.switchpending();
-   schedule_production_loop();
-
-   threadpool.resume();
-   ilog("start_block threadpool.resume()${t}", ("t", fc::time_point::now())); // for testing _produce_time_offset_us
 
    chain.commit_block();
    auto hbt = chain.head_block_time();
