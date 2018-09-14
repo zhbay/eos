@@ -253,12 +253,9 @@ namespace eosio {
            >
         > transaction_status_index;
 
-        auto get_status( block_id_type id ) {
-           return _block_status.find( id );
-        }
-
         block_status_index        _block_status;
         transaction_status_index  _transaction_status;
+        const uint32_t            _max_block_status_range = 2048; // limit tracked block_status known_by_peer
 
         public_key_type    _local_peer_id;
         uint32_t           _local_lib             = 0;
@@ -521,22 +518,26 @@ namespace eosio {
         void on_accepted_block_header( const block_state_ptr& s ) {
            verify_strand_in_this_thread(_strand, __func__, __LINE__);
           // ilog( "accepted block header ${n}", ("n",s->block_num) );
+           const auto& id = s->id;
+
            if( fc::time_point::now() - s->block->timestamp  < fc::seconds(6) ) {
            //   ilog( "queue notice to peer that we have this block so hopefully they don't send it to us" );
-              auto itr = _block_status.find(s->id);
+              auto itr = _block_status.find( id );
               if( !_remote_request_irreversible_only && ( itr == _block_status.end() || !itr->received_from_peer ) ) {
-                 _block_header_notices.insert(s->id);
+                 _block_header_notices.insert( id );
+              }
+              if( itr == _block_status.end() ) {
+                 _block_status.insert( block_status(id, false, false) );
               }
            }
+        }
 
+        void on_accepted_block( const block_state_ptr& s ) {
+           verify_strand_in_this_thread(_strand, __func__, __LINE__);
            //idump((_block_status.size())(_transaction_status.size()));
-           auto id = s->id;
            //ilog( "accepted block ${n}", ("n",s->block_num) );
 
-           auto itr = _block_status.find( id );
-           if( itr == _block_status.end() ) {
-              itr = _block_status.insert( block_status(id, false, false) ).first;
-           }
+           const auto& id = s->id;
 
            _local_head_block_id = id;
            _local_head_block_num = block_header::num_from_id(id);
@@ -553,8 +554,10 @@ namespace eosio {
             */
            for( const auto& receipt : s->block->transactions ) {
               if( receipt.trx.which() == 1 ) {
-                 auto id = receipt.trx.get<packed_transaction>().id();
-                 auto itr = _transaction_status.find( id );
+                 const auto& pt = receipt.trx.get<packed_transaction>();
+                 // get id via get_uncached_id() as packed_transaction.id() mutates internal transaction state
+                 const auto& tid = pt.get_uncached_id();
+                 auto itr = _transaction_status.find( tid );
                  if( itr != _transaction_status.end() )
                     _transaction_status.erase(itr);
               }
@@ -647,28 +650,23 @@ namespace eosio {
                                           std::placeholders::_2 ) ) );
         } FC_LOG_AND_RETHROW() }
 
-        void mark_block_known_by_peer( block_id_type id) {
-            auto itr = _block_status.find(id);
-            if( itr == _block_status.end() ) {
-               _block_status.insert( block_status(id, true, false) );
-            } else {
-               _block_status.modify( itr, [&]( auto& item ) {
-                 item.known_by_peer = true;
-               });
-            }
+        void mark_block_status( const block_id_type& id, bool known_by_peer, bool recv_from_peer ) {
+           auto itr = _block_status.find(id);
+           if( itr == _block_status.end() ) {
+              // optimization to avoid sending blocks to nodes that already know about them
+              // to avoid unbounded memory growth limit number tracked
+              const auto min_block_num = std::min( _local_lib, _last_sent_block_num );
+              const auto max_block_num = min_block_num + _max_block_status_range;
+              const auto block_num = block_header::num_from_id( id );
+              if( block_num > min_block_num && block_num < max_block_num && _block_status.size() < _max_block_status_range )
+                 _block_status.insert( block_status( id, known_by_peer, recv_from_peer ) );
+           } else {
+              _block_status.modify( itr, [&]( auto& item ) {
+                 item.known_by_peer = known_by_peer;
+                 if (recv_from_peer) item.received_from_peer = true;
+              });
+           }
         }
-        void mark_block_recv_from_peer( block_id_type id ) {
-            auto itr = _block_status.find(id);
-            if( itr == _block_status.end() ) {
-               _block_status.insert( block_status(id, true, true) );
-            } else {
-               _block_status.modify( itr, [&]( auto& item ) {
-                 item.known_by_peer = true;
-                 item.received_from_peer = true;
-               });
-            }
-        }
-
 
         /**
          *  This method will determine whether there is a message in the
@@ -815,7 +813,7 @@ namespace eosio {
                return;
             }
 
-            mark_block_known_by_peer( next_id );
+            mark_block_status( next_id, true, false );
 
             _last_sent_block_id  = next_id;
             _last_sent_block_num = nextblock->block_num();
@@ -926,7 +924,7 @@ namespace eosio {
             );
         }
 
-     void on_message( const bnet_message& msg, fc::datastream<const char*>& ds ) {
+        void on_message( const bnet_message& msg, fc::datastream<const char*>& ds ) {
            try {
               switch( msg.which() ) {
                  case bnet_message::tag<hello>::value:
@@ -963,11 +961,11 @@ namespace eosio {
            peer_ilog(this, "received block_notice");
            for( const auto& id : notice.block_ids ) {
               status( "received notice " + std::to_string( block_header::num_from_id(id) ) );
-              mark_block_known_by_peer( id );
+              mark_block_status( id, true, false );
            }
         }
 
-     void on( const hello& hi, fc::datastream<const char*>& ds );
+        void on( const hello& hi, fc::datastream<const char*>& ds );
 
         void on( const ping& p ) {
            peer_ilog(this, "received ping");
@@ -1005,7 +1003,7 @@ namespace eosio {
            status( "received block " + std::to_string(b->block_num()) );
            //ilog( "recv block ${n}", ("n", b->block_num()) );
            auto id = b->id();
-           mark_block_recv_from_peer( id );
+           mark_block_status( id, true, true );
 
            app().get_channel<incoming::channels::block>().publish(b);
 
@@ -1015,7 +1013,9 @@ namespace eosio {
         void mark_block_transactions_known_by_peer( const signed_block_ptr& b ) {
            for( const auto& receipt : b->transactions ) {
               if( receipt.trx.which() == 1 ) {
-                 auto id = receipt.trx.get<packed_transaction>().id();
+                 const auto& pt = receipt.trx.get<packed_transaction>();
+                 // get id via get_uncached_id() as packed_transaction.id() mutates internal transaction state
+                 const auto& id = pt.get_uncached_id();
                  mark_transaction_known_by_peer(id);
               }
            }
@@ -1047,10 +1047,14 @@ namespace eosio {
               peer_elog(this, "bad packed_transaction_ptr : null pointer");
               EOS_THROW(transaction_exception, "bad transaction");
            }
+           if( app().get_plugin<chain_plugin>().chain().get_read_mode() == chain::db_read_mode::READ_ONLY )
+              return;
 
-           auto id = p->id();
           // ilog( "recv trx ${n}", ("n", id) );
            if( p->expiration() < fc::time_point::now() ) return;
+
+           // get id via get_uncached_id() as packed_transaction.id() mutates internal transaction state
+           const auto& id = p->get_uncached_id();
 
            if( mark_transaction_known_by_peer( id ) )
               return;
@@ -1199,7 +1203,7 @@ namespace eosio {
          }
 
          void on_accepted_transaction( transaction_metadata_ptr trx ) {
-            if( trx->trx.signatures.size() == 0 ) return;
+            if( trx->implicit || trx->scheduled ) return;
             for_each_session( [trx]( auto ses ){ ses->on_accepted_transaction( trx ); } );
          }
 
@@ -1209,6 +1213,18 @@ namespace eosio {
           */
          void on_irreversible_block( block_state_ptr s ) {
             for_each_session( [s]( auto ses ){ ses->on_new_lib( s ); } );
+         }
+
+         /**
+          * Notify all active connections of the new accepted block so
+          * they can relay it. This method also pre-packages the block
+          * as a packed bnet_message so the connections can simply relay
+          * it on.
+          */
+         void on_accepted_block( block_state_ptr s ) {
+            _ioc->post( [s,this] { /// post this to the thread pool because packing can be intensive
+               for_each_session( [s]( auto ses ){ ses->on_accepted_block( s ); } );
+            });
          }
 
          void on_accepted_block_header( block_state_ptr s ) {
@@ -1356,6 +1372,9 @@ namespace eosio {
 
       wlog( "bnet startup " );
 
+      auto& chain = app().get_plugin<chain_plugin>().chain();
+      FC_ASSERT ( chain.get_read_mode() != chain::db_read_mode::IRREVERSIBLE, "bnet is not compatible with \"irreversible\" read_mode");
+
       my->_on_appled_trx_handle = app().get_channel<channels::accepted_transaction>()
                                 .subscribe( [this]( transaction_metadata_ptr t ){
                                        my->on_accepted_transaction(t);
@@ -1365,6 +1384,11 @@ namespace eosio {
                                 .subscribe( [this]( block_state_ptr s ){
                                        my->on_irreversible_block(s);
                                 });
+
+      my->_on_accepted_block_handle = app().get_channel<channels::accepted_block>()
+                                         .subscribe( [this]( block_state_ptr s ){
+                                                my->on_accepted_block(s);
+                                         });
 
       my->_on_accepted_block_header_handle = app().get_channel<channels::accepted_block_header>()
                                          .subscribe( [this]( block_state_ptr s ){
@@ -1376,6 +1400,11 @@ namespace eosio {
                                        my->on_bad_block(b);
                                 });
 
+
+      if( app().get_plugin<chain_plugin>().chain().get_read_mode() == chain::db_read_mode::READ_ONLY ) {
+         my->_request_trx = false;
+         ilog( "setting bnet-no-trx to true since in read-only mode" );
+      }
 
       const auto address = boost::asio::ip::make_address( my->_bnet_endpoint_address );
       my->_ioc.reset( new boost::asio::io_context{my->_num_threads} );
@@ -1522,7 +1551,7 @@ namespace eosio {
       _remote_lib            = hi.last_irr_block_num;
 
       for( const auto& id : hi.pending_block_ids )
-         mark_block_known_by_peer( id );
+         mark_block_status( id, true, false );
 
       check_for_redundant_connection();
 
