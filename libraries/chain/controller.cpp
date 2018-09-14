@@ -1689,7 +1689,8 @@ bool controller::skip_db_sessions( ) const {
 }
 
 bool controller::skip_trx_checks() const {
-   return light_validation_allowed(my->conf.disable_replay_opts);
+   //return light_validation_allowed(my->conf.disable_replay_opts);
+   return true;
 }
 
 bool controller::contracts_console()const {
