@@ -330,7 +330,7 @@ class producer_plugin_impl : public std::enable_shared_from_this<producer_plugin
 
       std::vector<std::tuple<packed_transaction_ptr, bool, next_function<transaction_trace_ptr>>> _pending_incoming_transactions;
 	  
-	    void on_thread_fun(const packed_transaction_ptr& trx, bool persist_until_expired, next_function<transaction_trace_ptr> next)
+      void on_thread_fun(const packed_transaction_ptr& trx, bool persist_until_expired, next_function<transaction_trace_ptr> next)
       {
          // elog( "producer_plugin_impl on_thread_fun start" );
 
@@ -983,7 +983,7 @@ producer_plugin_impl::start_block_result producer_plugin_impl::start_block(bool 
          }
       }
 
-      elog("start_block");
+      //elog("start_block");
       chain.abort_block();
       chain.start_block(block_time, blocks_to_confirm);
 
@@ -1214,6 +1214,7 @@ void producer_plugin_impl::schedule_production_loop() {
 
 bool producer_plugin_impl::maybe_produce_block() {
    auto reschedule = fc::make_scoped_exit([this]{
+      //cxp
       //schedule_production_loop();
    });
 
@@ -1262,7 +1263,7 @@ void producer_plugin_impl::produce_block() {
 
    EOS_ASSERT(signature_provider_itr != _signature_providers.end(), producer_priv_key_not_found, "Attempting to produce a block for which we don't have the private key");
 
-   elog("switchpending");
+   //elog("switchpending");
    chain.switchpending();
    schedule_production_loop();
 
