@@ -354,8 +354,8 @@ createfinished:
 
             arm_timer(boost::asio::high_resolution_timer::clock_type::now());
 
-            int m_threadNum=1;
-
+            int m_threadNum=period;
+            act_index=0;
 
             for (int i=0;i<m_threadNum;i++)
             {
@@ -411,11 +411,21 @@ createfinished:
 
          block_id_type reference_block_id ;//= cc.get_block_id_for_num(reference_block_num);
          unsigned act_batch=0;
-         unsigned act_index=0;
+
          while(true)
          {
              signed_transaction trx;
-             trx.actions.push_back(test_actions[act_index]);
+             {
+                boost::unique_lock<boost::mutex> lock(m_mutex);
+                trx.actions.push_back(test_actions[act_index]);
+                act_index++;
+                if(act_index>=test_actions.size())
+                    act_index=0;
+
+             }
+
+
+
              trx.context_free_actions.emplace_back(action({}, config::null_account_name, "nonce", fc::raw::pack(nonce++)));
              //trx.actions.emplace_back(action({}, config::null_account_name, "nonce", fc::raw::pack(nonce++)));
              trx.set_reference_block(reference_block_id);
@@ -423,9 +433,8 @@ createfinished:
              trx.max_net_usage_words = 100;
              trx.sign(a_priv_key, chainid);
              trxs.emplace_back(std::move(trx));
-             act_index++;
-             if(act_index>=test_actions.size())
-                 act_index=0;
+
+
 
              act_batch++;
              if(act_batch>=batch)
@@ -460,6 +469,8 @@ createfinished:
    unsigned timer_timeout;
    unsigned batch;
 
+   boost::mutex m_mutex;//互斥锁
+   uint64_t act_index;
 
    std::vector<name> accounts;
    std::vector<action> test_actions;

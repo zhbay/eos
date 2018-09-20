@@ -85,4 +85,4 @@ public:
 
 
 
-static CxpThreadPool threadpool(10);
+static CxpThreadPool threadpool(3);
