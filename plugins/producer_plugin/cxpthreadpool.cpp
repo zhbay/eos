@@ -121,6 +121,8 @@ void CxpThreadPool::resume()
 void CxpThreadPool::AddNewTask(const CxpTask& task)
 {
 
+    if(m_taskQueue[(m_read_queue+1)%2].get_size()>=100000)
+        return ;
     boost::unique_lock<boost::mutex> lock(m_switch_queue_mutex);
     m_taskQueue[(m_read_queue+1)%2].push_Task(task);
     trxcount++;

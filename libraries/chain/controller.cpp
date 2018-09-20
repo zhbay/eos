@@ -64,7 +64,9 @@ struct controller_impl {
 
    typedef pair<scope_name,action_name>                   handler_key;
    map< account_name, map<handler_key, apply_handler> >   apply_handlers;
-
+   boost::mutex actions_mutex;//互斥锁
+   boost::mutex trxs_mutex;//互斥锁
+   boost::mutex authorization_mutex;//互斥锁
    /**
     *  Transactions that were undone by pop_block or abort_block, transactions
     *  are removed from this list if they are re-applied in other blocks. Producers
@@ -554,7 +556,7 @@ struct controller_impl {
       try {
          if (add_to_fork_db) {
             getfinalizepending()->_pending_block_state->validated = true;
-            
+
             auto new_bsp = fork_db.add(getfinalizepending()->_pending_block_state);
             emit(self.accepted_block_header, getfinalizepending()->_pending_block_state);
             head = fork_db.head();
@@ -774,7 +776,8 @@ struct controller_impl {
    const transaction_receipt& push_receipt( const T& trx, transaction_receipt_header::status_enum status,
                                             uint64_t cpu_usage_us, uint64_t net_usage ) {
       uint64_t net_usage_words = net_usage / 8;
-      EOS_ASSERT( net_usage_words*8 == net_usage, transaction_exception, "net_usage is not divisible by 8" );
+      //cxp
+      //EOS_ASSERT( net_usage_words*8 == net_usage, transaction_exception, "net_usage is not divisible by 8" );
       getpending()->_pending_block_state->block->transactions.emplace_back( trx );
       transaction_receipt& r = getpending()->_pending_block_state->block->transactions.back();
       r.cpu_usage_us         = cpu_usage_us;
@@ -795,7 +798,7 @@ struct controller_impl {
    {
       EOS_ASSERT(deadline != fc::time_point(), transaction_exception, "deadline cannot be uninitialized");
 
-                                        
+
 
       transaction_trace_ptr trace;
       try {
@@ -811,11 +814,11 @@ struct controller_impl {
                trx_context.init_for_implicit_trx();
                trx_context.can_subjectively_fail = false;
             } else {
-                                         
+
                trx_context.init_for_input_trx( trx->packed_trx.get_unprunable_size(),
                                                trx->packed_trx.get_prunable_size(),
                                                trx->trx.signatures.size());
-                                         
+
             }
 
             if( trx_context.can_subjectively_fail && getpending()->_block_status == controller::block_status::incomplete ) {
@@ -825,9 +828,10 @@ struct controller_impl {
 
             trx_context.delay = fc::seconds(trx->trx.delay_sec);
 
-                                          
 
-            if( !self.skip_auth_check() && !implicit ) {
+
+            if( !self.skip_auth_check() && !implicit ) {                                      
+               boost::unique_lock<boost::mutex> lock(authorization_mutex);
                authorization.check_authorization(
                        trx->trx.actions,
                        trx->recover_keys( chain_id ),
@@ -839,9 +843,9 @@ struct controller_impl {
                        false
                );
             }
-                                          
+
             trx_context.exec();
-                                          
+
             trx_context.finalize(); // Automatically rounds up network and CPU usage in trace and bills payers if successful
 
             auto restore = make_block_restore_point();
@@ -850,23 +854,30 @@ struct controller_impl {
                transaction_receipt::status_enum s = (trx_context.delay == fc::seconds(0))
                                                     ? transaction_receipt::executed
                                                     : transaction_receipt::delayed;
-               trace->receipt = push_receipt(trx->packed_trx, s, trx_context.billed_cpu_time_us, trace->net_usage);
-               getpending()->_pending_block_state->trxs.emplace_back(trx);
-                                          
+                       {
+                           boost::unique_lock<boost::mutex> lock(trxs_mutex);
+                           trace->receipt = push_receipt(trx->packed_trx, s, trx_context.billed_cpu_time_us, trace->net_usage);
+                           getpending()->_pending_block_state->trxs.emplace_back(trx);
+                       }
+
+
             } else {
                transaction_receipt_header r;
                r.status = transaction_receipt::executed;
                r.cpu_usage_us = trx_context.billed_cpu_time_us;
                r.net_usage_words = trace->net_usage / 8;
                trace->receipt = r;
-                                          
+
+            }
+            {
+                boost::unique_lock<boost::mutex> lock(actions_mutex);
+                fc::move_append(getpending()->_actions, move(trx_context.executed));
             }
 
-            fc::move_append(getpending()->_actions, move(trx_context.executed));
 
             // call the accept signal but only once for this transaction
             if (!trx->accepted) {
-                                          
+
                emit( self.accepted_transaction, trx);
                trx->accepted = true;
             }
@@ -877,7 +888,7 @@ struct controller_impl {
             if ( read_mode != db_read_mode::SPECULATIVE && getpending()->_block_status == controller::block_status::incomplete ) {
                //this may happen automatically in destructor, but I prefere make it more explicit
                trx_context.undo();
-                                          
+
             } else {
                restore.cancel();
                trx_context.squash();
@@ -1041,6 +1052,7 @@ struct controller_impl {
 //         for(boost::thread & thread : threads) {
 //              thread.join();
 //          }
+         //cxp
          switchpending();
          finalize_block();
          sign_block( [&]( const auto& ){ return b->producer_signature; }, false ); //trust );

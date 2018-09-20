@@ -332,12 +332,16 @@ class producer_plugin_impl : public std::enable_shared_from_this<producer_plugin
 	  
       void on_thread_fun(const packed_transaction_ptr& trx, bool persist_until_expired, next_function<transaction_trace_ptr> next)
       {
-         // elog( "producer_plugin_impl on_thread_fun start" );
+
 
           chain::controller& chain = app().get_plugin<chain_plugin>().chain();
           //chain::controller& producer_plug=app().get_plugin<producer_plug>().;
-
-		  (std::make_shared<transaction_metadata>(*trx))->trx.set_reference_block(chain.head_block_id());
+          uint16_t ref_block_num=trx->get_transaction().ref_block_num;
+          //elog( "ref_block_num1=${e}",("e",ref_block_num));
+          trx->get_transaction().set_reference_block(chain.head_block_id());
+          ref_block_num=trx->get_transaction().ref_block_num;
+          //elog( "ref_block_num2=${e}",("e",ref_block_num));
+          //(std::make_shared<transaction_metadata>(*trx))->trx.set_reference_block(chain.head_block_id());
 		  
           auto block_time = chain.pending_block_time();
 

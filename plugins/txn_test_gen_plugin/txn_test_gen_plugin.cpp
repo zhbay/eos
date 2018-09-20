@@ -287,6 +287,21 @@ createfinished:
       push_transactions(std::move(trxs), next);
    }
 
+   void run()
+   {
+       while(running)
+       {
+           send_transaction([this](const fc::exception_ptr& e){
+              if (e) {
+                 elog("pushing transaction failed: ${e}", ("e", e->to_detail_string()));
+                 //stop_generation();
+              } else {
+                 //arm_timer(timer.expires_at());
+              }
+           });
+       }
+   }
+
    void start_generation(const std::string& salt, const uint64_t& period, const uint64_t& batch_size) {
             if(running)
             {
@@ -306,7 +321,7 @@ createfinished:
             if(accounts.size()<2)
                 return ;
             running = true;
-            act_index=0;
+
             controller& cc = app().get_plugin<chain_plugin>().chain();
             auto abi_serializer_max_time = app().get_plugin<chain_plugin>().get_abi_serializer_max_time();
             abi_serializer eosio_token_serializer{fc::json::from_string(eosio_token_abi).as<abi_def>(), abi_serializer_max_time};
@@ -338,6 +353,16 @@ createfinished:
             ilog("Started transaction test plugin; performing ${p} transactions every ${m}ms", ("p", batch_size)("m", period));
 
             arm_timer(boost::asio::high_resolution_timer::clock_type::now());
+
+            int m_threadNum=1;
+
+
+            for (int i=0;i<m_threadNum;i++)
+            {
+                //生成多个线程，绑定run函数，添加到线程组
+                m_threadGroup.add_thread(
+                    new boost::thread(boost::bind(&txn_test_gen_plugin_impl::run,this)));
+            }
 
 
    }
@@ -384,8 +409,9 @@ createfinished:
             }
          }
 
-         block_id_type reference_block_id = cc.get_block_id_for_num(reference_block_num);
+         block_id_type reference_block_id ;//= cc.get_block_id_for_num(reference_block_num);
          unsigned act_batch=0;
+         unsigned act_index=0;
          while(true)
          {
              signed_transaction trx;
@@ -424,6 +450,7 @@ createfinished:
       timer.cancel();
       running = false;
       test_actions.clear();
+      m_threadGroup.join_all();
       ilog("Stopping transaction generation test");
    }
 
@@ -432,12 +459,13 @@ createfinished:
 
    unsigned timer_timeout;
    unsigned batch;
-   unsigned act_index;
+
 
    std::vector<name> accounts;
    std::vector<action> test_actions;
 
    int32_t txn_reference_block_lag;
+   boost::thread_group m_threadGroup;
 };
 
 txn_test_gen_plugin::txn_test_gen_plugin() {}
