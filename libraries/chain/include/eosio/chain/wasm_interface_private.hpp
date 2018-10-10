@@ -50,12 +50,25 @@ namespace eosio { namespace chain {
          return mem_image;
       }
 
+#include <sys/syscall.h>
+
       std::unique_ptr<wasm_instantiated_module_interface>& get_instantiated_module( const digest_type& code_id,
                                                                                     const shared_string& code,
                                                                                     transaction_context& trx_context )
       {
-         auto it = instantiation_cache.find(code_id);
-         if(it == instantiation_cache.end()) {
+        pid_t  tid=syscall(SYS_gettid);//pthread_self();
+       // elog("tid=${a}",("a",tid));
+
+
+         auto it = instantiation_cache[tid].find(code_id);
+
+
+         //boost::unique_lock<boost::mutex> lock(m_mutex);
+
+
+
+         if(it == instantiation_cache[tid].end())
+         {
             auto timer_pause = fc::make_scoped_exit([&](){
                trx_context.resume_billing_timer();
             });
@@ -84,13 +97,25 @@ namespace eosio { namespace chain {
             } catch(const IR::ValidationException& e) {
                EOS_ASSERT(false, wasm_serialization_error, e.message.c_str());
             }
-            it = instantiation_cache.emplace(code_id, runtime_interface->instantiate_module((const char*)bytes.data(), bytes.size(), parse_initial_memory(module))).first;
+
+             my_runtime_interface[tid]=std::make_unique<webassembly::binaryen::binaryen_runtime>();
+             it = instantiation_cache[tid].emplace(code_id, my_runtime_interface[tid]->instantiate_module((const char*)bytes.data(), bytes.size(), parse_initial_memory(module))).first;
+
          }
          return it->second;
       }
 
+      std::map<pid_t ,std::unique_ptr<wasm_runtime_interface>> my_runtime_interface;
       std::unique_ptr<wasm_runtime_interface> runtime_interface;
-      map<digest_type, std::unique_ptr<wasm_instantiated_module_interface>> instantiation_cache;
+
+
+
+      using map_wasm_instantiated_module=map<digest_type, std::unique_ptr<wasm_instantiated_module_interface>> ;
+      std::map<pid_t ,map_wasm_instantiated_module> instantiation_cache;
+
+
+
+      
    };
 
 #define _REGISTER_INTRINSIC_EXPLICIT(CLS, MOD, METHOD, WASM_SIG, NAME, SIG)\

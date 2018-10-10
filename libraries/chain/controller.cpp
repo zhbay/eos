@@ -109,7 +109,9 @@ struct controller_impl {
 
    typedef pair<scope_name,action_name>                   handler_key;
    map< account_name, map<handler_key, apply_handler> >   apply_handlers;
-
+   boost::mutex actions_mutex;//»¥³âËø
+   boost::mutex trxs_mutex;//»¥³âËø
+   boost::mutex authorization_mutex;//»¥³âËø
    /**
     *  Transactions that were undone by pop_block or abort_block, transactions
     *  are removed from this list if they are re-applied in other blocks. Producers
@@ -798,6 +800,7 @@ struct controller_impl {
             trx_context.delay = fc::seconds(trx->trx.delay_sec);
 
             if( !self.skip_auth_check() && !trx->implicit ) {
+			   boost::unique_lock<boost::mutex> lock(authorization_mutex);
                authorization.check_authorization(
                        trx->trx.actions,
                        trx->recover_keys( chain_id ),
@@ -818,6 +821,7 @@ struct controller_impl {
                transaction_receipt::status_enum s = (trx_context.delay == fc::seconds(0))
                                                     ? transaction_receipt::executed
                                                     : transaction_receipt::delayed;
+               boost::unique_lock<boost::mutex> lock(trxs_mutex);
                trace->receipt = push_receipt(trx->packed_trx, s, trx_context.billed_cpu_time_us, trace->net_usage);
                pending->_pending_block_state->trxs.emplace_back(trx);
             } else {
@@ -828,7 +832,10 @@ struct controller_impl {
                trace->receipt = r;
             }
 
-            fc::move_append(pending->_actions, move(trx_context.executed));
+			{
+            	boost::unique_lock<boost::mutex> lock(actions_mutex);
+	            fc::move_append(pending->_actions, move(trx_context.executed));
+			}
 
             // call the accept signal but only once for this transaction
             if (!trx->accepted) {
