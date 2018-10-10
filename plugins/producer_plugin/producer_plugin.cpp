@@ -1251,6 +1251,8 @@ void producer_plugin_impl::schedule_production_loop() {
          EOS_ASSERT( chain.pending_block_state(), missing_pending_block_state, "producing without pending_block_state, start_block succeeded" );
          auto deadline = chain.pending_block_time().time_since_epoch().count() + (last_block ? _last_block_time_offset_us : _produce_time_offset_us);
          _timer.expires_at( epoch + boost::posix_time::microseconds( deadline ));
+		 threadpool.resume();
+         ilog("produce_block  threadpool.resume() ${t}", ("t", fc::time_point::now())); // for testing _produce_time_offset_us
          fc_dlog(_log, "Scheduling Block Production on Normal Block #${num} for ${time}", ("num", chain.pending_block_state()->block_num)("time",deadline));
       } else {
          EOS_ASSERT( chain.pending_block_state(), missing_pending_block_state, "producing without pending_block_state" );
@@ -1380,8 +1382,7 @@ void producer_plugin_impl::produce_block() {
    block_state_ptr new_bs = chain.head_block_state();
    _producer_watermarks[new_bs->header.producer] = chain.head_block_num();
 
-   threadpool.resume();
-   ilog("produce_block  threadpool.resume() ${t}", ("t", fc::time_point::now())); // for testing _produce_time_offset_us
+
   ilog("Produced block ${id}... #${n} @ ${t} signed by ${p} [trxs: ${count}, lib: ${lib}, confirmed: ${confs}] ,readqueue:${readqueue},writequeue:${writequeue}\n",
         ("p",new_bs->header.producer)("id",fc::variant(new_bs->id).as_string().substr(0,16))
         ("n",new_bs->block_num)("t",new_bs->header.timestamp)
