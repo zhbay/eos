@@ -24,12 +24,13 @@ namespace eosio { namespace chain {
 
    struct wasm_interface_impl {
       wasm_interface_impl(wasm_interface::vm_type vm) {
-         if(vm == wasm_interface::vm_type::wavm)
-            runtime_interface = std::make_unique<webassembly::wavm::wavm_runtime>();
-         else if(vm == wasm_interface::vm_type::binaryen)
-            runtime_interface = std::make_unique<webassembly::binaryen::binaryen_runtime>();
-         else
-            EOS_THROW(wasm_exception, "wasm_interface_impl fall through");
+//         if(vm == wasm_interface::vm_type::wavm)
+//            runtime_interface = std::make_unique<webassembly::wavm::wavm_runtime>();
+//         else if(vm == wasm_interface::vm_type::binaryen)
+//            runtime_interface = std::make_unique<webassembly::binaryen::binaryen_runtime>();
+//         else
+//            EOS_THROW(wasm_exception, "wasm_interface_impl fall through");
+          _vm=vm;
       }
 
       std::vector<uint8_t> parse_initial_memory(const Module& module) {
@@ -50,6 +51,47 @@ namespace eosio { namespace chain {
          return mem_image;
       }
 
+//      std::unique_ptr<wasm_instantiated_module_interface>& get_instantiated_module( const digest_type& code_id,
+//                                                                                         const shared_string& code,
+//                                                                                         transaction_context& trx_context )
+//           {
+//              auto it = instantiation_cache.find(code_id);
+//              if(it == instantiation_cache.end()) {
+//                 auto timer_pause = fc::make_scoped_exit([&](){
+//                    trx_context.resume_billing_timer();
+//                 });
+//                 trx_context.pause_billing_timer();
+//                 IR::Module module;
+//                 try {
+//                    Serialization::MemoryInputStream stream((const U8*)code.data(), code.size());
+//                    WASM::serialize(stream, module);
+//                    module.userSections.clear();
+//                 } catch(const Serialization::FatalSerializationException& e) {
+//                    EOS_ASSERT(false, wasm_serialization_error, e.message.c_str());
+//                 } catch(const IR::ValidationException& e) {
+//                    EOS_ASSERT(false, wasm_serialization_error, e.message.c_str());
+//                 }
+
+//                 wasm_injections::wasm_binary_injection injector(module);
+//                 injector.inject();
+
+//                 std::vector<U8> bytes;
+//                 try {
+//                    Serialization::ArrayOutputStream outstream;
+//                    WASM::serialize(outstream, module);
+//                    bytes = outstream.getBytes();
+//                 } catch(const Serialization::FatalSerializationException& e) {
+//                    EOS_ASSERT(false, wasm_serialization_error, e.message.c_str());
+//                 } catch(const IR::ValidationException& e) {
+//                    EOS_ASSERT(false, wasm_serialization_error, e.message.c_str());
+//                 }
+//                 it = instantiation_cache.emplace(code_id, runtime_interface->instantiate_module((const char*)bytes.data(), bytes.size(), parse_initial_memory(module))).first;
+//              }
+//              return it->second;
+//           }
+
+//           std::unique_ptr<wasm_runtime_interface> runtime_interface;
+//           map<digest_type, std::unique_ptr<wasm_instantiated_module_interface>> instantiation_cache;
 #include <sys/syscall.h>
 
       std::unique_ptr<wasm_instantiated_module_interface>& get_instantiated_module( const digest_type& code_id,
@@ -57,15 +99,10 @@ namespace eosio { namespace chain {
                                                                                     transaction_context& trx_context )
       {
         pid_t  tid=syscall(SYS_gettid);//pthread_self();
-       // elog("tid=${a}",("a",tid));
+
 
 
          auto it = instantiation_cache[tid].find(code_id);
-
-
-         //boost::unique_lock<boost::mutex> lock(m_mutex);
-
-
 
          if(it == instantiation_cache[tid].end())
          {
@@ -97,8 +134,17 @@ namespace eosio { namespace chain {
             } catch(const IR::ValidationException& e) {
                EOS_ASSERT(false, wasm_serialization_error, e.message.c_str());
             }
+             //elog("tid=${a} bytes.size()=${b}",("a",tid)("b",bytes.size()));
+             if(my_runtime_interface.find(tid)==my_runtime_interface.end())
+             {
+                if(_vm == wasm_interface::vm_type::wavm)
+                    my_runtime_interface[tid] = std::make_unique<webassembly::wavm::wavm_runtime>();
+                 else if(_vm == wasm_interface::vm_type::binaryen)
+                    my_runtime_interface[tid] = std::make_unique<webassembly::binaryen::binaryen_runtime>();
+                 else
+                    EOS_THROW(wasm_exception, "wasm_interface_impl fall through");
 
-             my_runtime_interface[tid]=std::make_unique<webassembly::binaryen::binaryen_runtime>();
+             }
              it = instantiation_cache[tid].emplace(code_id, my_runtime_interface[tid]->instantiate_module((const char*)bytes.data(), bytes.size(), parse_initial_memory(module))).first;
 
          }
@@ -106,13 +152,13 @@ namespace eosio { namespace chain {
       }
 
       std::map<pid_t ,std::unique_ptr<wasm_runtime_interface>> my_runtime_interface;
-      std::unique_ptr<wasm_runtime_interface> runtime_interface;
+      //std::unique_ptr<wasm_runtime_interface> runtime_interface;
 
 
 
       using map_wasm_instantiated_module=map<digest_type, std::unique_ptr<wasm_instantiated_module_interface>> ;
       std::map<pid_t ,map_wasm_instantiated_module> instantiation_cache;
-
+      wasm_interface::vm_type _vm;
 
 
       
