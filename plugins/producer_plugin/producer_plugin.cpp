@@ -25,6 +25,7 @@
 #include <boost/multi_index/ordered_index.hpp>
 #include <boost/signals2/connection.hpp>
 #include "cxpthreadpool.h"
+#include "coinxp.match.abi.hpp"
 namespace bmi = boost::multi_index;
 using bmi::indexed_by;
 using bmi::ordered_non_unique;
@@ -107,6 +108,7 @@ class producer_plugin_impl : public std::enable_shared_from_this<producer_plugin
       :_timer(io)
       ,_transaction_ack_channel(app().get_channel<compat::channels::transaction_ack>())
       {
+
       }
 
       optional<fc::time_point> calculate_next_block_time(const account_name& producer_name, const block_timestamp_type& current_block_time) const;
@@ -152,7 +154,7 @@ class producer_plugin_impl : public std::enable_shared_from_this<producer_plugin
 
       fc::optional<scoped_connection>                          _accepted_block_connection;
       fc::optional<scoped_connection>                          _irreversible_block_connection;
-
+      abi_serializer                                           cxp_match_serializer;
       /*
        * HACK ALERT
        * Boost timers can be in a state where a handler has not yet executed but is not abortable.
@@ -330,75 +332,139 @@ class producer_plugin_impl : public std::enable_shared_from_this<producer_plugin
       }
 
       std::deque<std::tuple<packed_transaction_ptr, bool, next_function<transaction_trace_ptr>>> _pending_incoming_transactions;
- void on_thread_fun(const packed_transaction_ptr& trx, bool persist_until_expired, next_function<transaction_trace_ptr> next)
-      {
 
-          chain::controller& chain = app().get_plugin<chain_plugin>().chain();
-          //chain::controller& producer_plug=app().get_plugin<producer_plug>().;
-          uint16_t ref_block_num=trx->get_transaction().ref_block_num;
-          //elog( "ref_block_num1=${e}",("e",ref_block_num));
-          trx->get_transaction().set_reference_block(chain.head_block_id());
-          ref_block_num=trx->get_transaction().ref_block_num;
-          //elog( "ref_block_num2=${e}",("e",ref_block_num));
-          //(std::make_shared<transaction_metadata>(*trx))->trx.set_reference_block(chain.head_block_id());
-		  
-          auto block_time = chain.pending_block_time();
+      void on_thread_fun(const packed_transaction_ptr& trx, bool persist_until_expired, next_function<transaction_trace_ptr> next) {
 
 
-          auto send_response = [this, &trx, &next](const fc::static_variant<fc::exception_ptr, transaction_trace_ptr>& response) {
-             next(response);
-             if (response.contains<fc::exception_ptr>()) {
-                _transaction_ack_channel.publish(std::pair<fc::exception_ptr, packed_transaction_ptr>(response.get<fc::exception_ptr>(), trx));
-             } else {
-                _transaction_ack_channel.publish(std::pair<fc::exception_ptr, packed_transaction_ptr>(nullptr, trx));
-             }
-          };
+         chain::controller& chain = app().get_plugin<chain_plugin>().chain();
+         if (!chain.pending_block_state()) {
+            _pending_incoming_transactions.emplace_back(trx, persist_until_expired, next);
+            return;
+         }
 
-          auto id = trx->id();
-          if( fc::time_point(trx->expiration()) < block_time ) {
-             send_response(std::static_pointer_cast<fc::exception>(std::make_shared<expired_tx_exception>(FC_LOG_MESSAGE(error, "expired transaction ${id}", ("id", id)) )));
-             return;
-          }
+         auto block_time = chain.pending_block_state()->header.timestamp.to_time_point();
 
-          if( chain.is_known_unexpired_transaction(id) ) {
-             send_response(std::static_pointer_cast<fc::exception>(std::make_shared<tx_duplicate>(FC_LOG_MESSAGE(error, "duplicate transaction ${id}", ("id", id)) )));
-             return;
-          }
+         auto send_response = [this, &trx, &next](const fc::static_variant<fc::exception_ptr, transaction_trace_ptr>& response) {
+            next(response);
+            if (response.contains<fc::exception_ptr>()) {
+               _transaction_ack_channel.publish(std::pair<fc::exception_ptr, packed_transaction_ptr>(response.get<fc::exception_ptr>(), trx));
+            } else {
+               _transaction_ack_channel.publish(std::pair<fc::exception_ptr, packed_transaction_ptr>(nullptr, trx));
+            }
+         };
 
-          auto deadline = fc::time_point::now() + fc::milliseconds(_max_transaction_time_ms);
-          bool deadline_is_subjective = false;
-          if (_max_transaction_time_ms < 0 || (_pending_block_mode == pending_block_mode::producing && block_time < deadline) ) {
-             deadline_is_subjective = true;
-             deadline = block_time;
-          }
+         auto id = trx->id();
+         if( fc::time_point(trx->expiration()) < block_time ) {
+            send_response(std::static_pointer_cast<fc::exception>(std::make_shared<expired_tx_exception>(FC_LOG_MESSAGE(error, "expired transaction ${id}", ("id", id)) )));
+            return;
+         }
 
-          try {
-             auto trace = chain.push_transaction(std::make_shared<transaction_metadata>(*trx), deadline);
-             if (trace->except) {
-                if (failure_is_subjective(*trace->except, deadline_is_subjective)) {
-                    // elog( "producer_plugin_impl on_thread_fun deadline_is_subjective" );
-                  // _pending_incoming_transactions.emplace_back(trx, persist_until_expired, next);
-                } else {
-                   auto e_ptr = trace->except->dynamic_copy_exception();
-                   send_response(e_ptr);
-                }
-             } else {
-                if (persist_until_expired) {
-                    //elog( "producer_plugin_impl on_thread_fun persist_until_expired" );
-                   // if this trx didnt fail/soft-fail and the persist flag is set, store its ID so that we can
-                   // ensure its applied to all future speculative blocks as well.
-                  // _persistent_transactions.insert(transaction_id_with_expiry{trx->id(), trx->expiration()});
-                }
-                send_response(trace);
-             }
+         if( chain.is_known_unexpired_transaction(id) ) {
+            send_response(std::static_pointer_cast<fc::exception>(std::make_shared<tx_duplicate>(FC_LOG_MESSAGE(error, "duplicate transaction ${id}", ("id", id)) )));
+            return;
+         }
 
-          } catch ( const guard_exception& e ) {
-             app().get_plugin<chain_plugin>().handle_guard_exception(e);
-          } catch ( boost::interprocess::bad_alloc& ) {
-             raise(SIGUSR1);
-          } CATCH_AND_CALL(send_response);
-       // elog( "producer_plugin_impl on_thread_fun end" );
+         auto deadline = fc::time_point::now() + fc::milliseconds(_max_transaction_time_ms);
+         bool deadline_is_subjective = false;
+         if (_max_transaction_time_ms < 0 || (_pending_block_mode == pending_block_mode::producing && block_time < deadline) ) {
+            deadline_is_subjective = true;
+            deadline = block_time;
+         }
+
+         try {
+            auto trace = chain.push_transaction(std::make_shared<transaction_metadata>(*trx), deadline);
+            if (trace->except) {
+               if (failure_is_subjective(*trace->except, deadline_is_subjective)) {
+                  _pending_incoming_transactions.emplace_back(trx, persist_until_expired, next);
+               } else {
+                  auto e_ptr = trace->except->dynamic_copy_exception();
+                  send_response(e_ptr);
+               }
+            } else {
+               if (persist_until_expired) {
+                  // if this trx didnt fail/soft-fail and the persist flag is set, store its ID so that we can
+                  // ensure its applied to all future speculative blocks as well.
+                  _persistent_transactions.insert(transaction_id_with_expiry{trx->id(), trx->expiration()});
+               }
+               send_response(trace);
+            }
+
+         } catch ( const guard_exception& e ) {
+            app().get_plugin<chain_plugin>().handle_guard_exception(e);
+         } catch ( boost::interprocess::bad_alloc& ) {
+            raise(SIGUSR1);
+         } CATCH_AND_CALL(send_response);
       }
+
+// void on_thread_fun(const packed_transaction_ptr& trx, bool persist_until_expired, next_function<transaction_trace_ptr> next)
+//      {
+
+//          chain::controller& chain = app().get_plugin<chain_plugin>().chain();
+//          //chain::controller& producer_plug=app().get_plugin<producer_plug>().;
+//          uint16_t ref_block_num=trx->get_transaction().ref_block_num;
+//          //elog( "ref_block_num1=${e}",("e",ref_block_num));
+//          trx->get_transaction().set_reference_block(chain.head_block_id());
+//          ref_block_num=trx->get_transaction().ref_block_num;
+//          //elog( "ref_block_num2=${e}",("e",ref_block_num));
+//          //(std::make_shared<transaction_metadata>(*trx))->trx.set_reference_block(chain.head_block_id());
+		  
+//          auto block_time = chain.pending_block_time();
+
+
+//          auto send_response = [this, &trx, &next](const fc::static_variant<fc::exception_ptr, transaction_trace_ptr>& response) {
+//             next(response);
+//             if (response.contains<fc::exception_ptr>()) {
+//                _transaction_ack_channel.publish(std::pair<fc::exception_ptr, packed_transaction_ptr>(response.get<fc::exception_ptr>(), trx));
+//             } else {
+//                _transaction_ack_channel.publish(std::pair<fc::exception_ptr, packed_transaction_ptr>(nullptr, trx));
+//             }
+//          };
+
+//          auto id = trx->id();
+//          if( fc::time_point(trx->expiration()) < block_time ) {
+//             send_response(std::static_pointer_cast<fc::exception>(std::make_shared<expired_tx_exception>(FC_LOG_MESSAGE(error, "expired transaction ${id}", ("id", id)) )));
+//             return;
+//          }
+
+//          if( chain.is_known_unexpired_transaction(id) ) {
+//             send_response(std::static_pointer_cast<fc::exception>(std::make_shared<tx_duplicate>(FC_LOG_MESSAGE(error, "duplicate transaction ${id}", ("id", id)) )));
+//             return;
+//          }
+
+//          auto deadline = fc::time_point::now() + fc::milliseconds(_max_transaction_time_ms);
+//          bool deadline_is_subjective = false;
+//          if (_max_transaction_time_ms < 0 || (_pending_block_mode == pending_block_mode::producing && block_time < deadline) ) {
+//             deadline_is_subjective = true;
+//             deadline = block_time;
+//          }
+
+//          try {
+//             auto trace = chain.push_transaction(std::make_shared<transaction_metadata>(*trx), deadline);
+//             if (trace->except) {
+//                if (failure_is_subjective(*trace->except, deadline_is_subjective)) {
+//                    // elog( "producer_plugin_impl on_thread_fun deadline_is_subjective" );
+//                  // _pending_incoming_transactions.emplace_back(trx, persist_until_expired, next);
+//                } else {
+//                   auto e_ptr = trace->except->dynamic_copy_exception();
+//                   send_response(e_ptr);
+//                }
+//             } else {
+//                if (persist_until_expired) {
+//                    //elog( "producer_plugin_impl on_thread_fun persist_until_expired" );
+//                   // if this trx didnt fail/soft-fail and the persist flag is set, store its ID so that we can
+//                   // ensure its applied to all future speculative blocks as well.
+//                  // _persistent_transactions.insert(transaction_id_with_expiry{trx->id(), trx->expiration()});
+//                }
+//                send_response(trace);
+//             }
+
+//          } catch ( const guard_exception& e ) {
+//             app().get_plugin<chain_plugin>().handle_guard_exception(e);
+//          } catch ( boost::interprocess::bad_alloc& ) {
+//             raise(SIGUSR1);
+//          } CATCH_AND_CALL(send_response);
+//       // elog( "producer_plugin_impl on_thread_fun end" );
+//      }
 
       void on_incoming_transaction_async(const packed_transaction_ptr& trx, bool persist_until_expired, next_function<transaction_trace_ptr> next) {
 
@@ -406,6 +472,7 @@ class producer_plugin_impl : public std::enable_shared_from_this<producer_plugin
 		
          if(threadpool.get_thread_count()>0)
           {
+              
               CxpTask task = boost::bind(&producer_plugin_impl::on_thread_fun,this,trx,persist_until_expired,next);
               threadpool.AddNewTask(task);
               return ;
@@ -758,6 +825,9 @@ void producer_plugin::plugin_startup()
 
    threadpool.init();
 
+
+   auto abi_serializer_max_time = app().get_plugin<chain_plugin>().get_abi_serializer_max_time();
+   my->cxp_match_serializer.set_abi(fc::json::from_string(coinxp_match_abi).as<abi_def>(), abi_serializer_max_time);
    my->schedule_production_loop();
 
    ilog("producer plugin:  plugin_startup() end");
