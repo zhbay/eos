@@ -26,7 +26,7 @@
 #include <boost/multi_index/ordered_index.hpp>
 #include <boost/signals2/connection.hpp>
 #include "cxpthreadpool.h"
-#include "coinxp.match.abi.hpp"
+
 namespace bmi = boost::multi_index;
 using bmi::indexed_by;
 using bmi::ordered_non_unique;
@@ -158,7 +158,7 @@ class producer_plugin_impl : public std::enable_shared_from_this<producer_plugin
 
       fc::optional<scoped_connection>                          _accepted_block_connection;
       fc::optional<scoped_connection>                          _irreversible_block_connection;
-      abi_serializer                                           cxp_match_serializer;
+
       /*
        * HACK ALERT
        * Boost timers can be in a state where a handler has not yet executed but is not abortable.
@@ -342,7 +342,7 @@ class producer_plugin_impl : public std::enable_shared_from_this<producer_plugin
 
          chain::controller& chain = app().get_plugin<chain_plugin>().chain();
          if (!chain.pending_block_state()) {
-            _pending_incoming_transactions.emplace_back(trx, persist_until_expired, next);
+            //_pending_incoming_transactions.emplace_back(trx, persist_until_expired, next);
             return;
          }
 
@@ -379,7 +379,7 @@ class producer_plugin_impl : public std::enable_shared_from_this<producer_plugin
             auto trace = chain.push_transaction(std::make_shared<transaction_metadata>(*trx), deadline);
             if (trace->except) {
                if (failure_is_subjective(*trace->except, deadline_is_subjective)) {
-                  _pending_incoming_transactions.emplace_back(trx, persist_until_expired, next);
+                  //_pending_incoming_transactions.emplace_back(trx, persist_until_expired, next);
                } else {
                   auto e_ptr = trace->except->dynamic_copy_exception();
                   send_response(e_ptr);
@@ -388,7 +388,9 @@ class producer_plugin_impl : public std::enable_shared_from_this<producer_plugin
                if (persist_until_expired) {
                   // if this trx didnt fail/soft-fail and the persist flag is set, store its ID so that we can
                   // ensure its applied to all future speculative blocks as well.
-                  _persistent_transactions.insert(transaction_id_with_expiry{trx->id(), trx->expiration()});
+
+                  //_persistent_transactions.insert(transaction_id_with_expiry{trx->id(), trx->expiration()});
+                  //elog("_persistent_transactions=${a}",("a",_persistent_transactions.size()));
                }
                send_response(trace);
             }
@@ -472,13 +474,12 @@ class producer_plugin_impl : public std::enable_shared_from_this<producer_plugin
 
       void on_incoming_transaction_async(const packed_transaction_ptr& trx, bool persist_until_expired, next_function<transaction_trace_ptr> next) {
 
-	    // elog( "producer_plugin_impl on_incoming_transaction_async" );
+
 		
          if(threadpool.get_thread_count()>0)
           {
-              
               CxpTask task = boost::bind(&producer_plugin_impl::on_thread_fun,this,trx,persist_until_expired,next);
-              threadpool.AddNewTask(task);
+              threadpool.AddNewTask(task,trx);
               return ;
           }
        //  boost::thread th { [this, trx, persist_until_expired, next](){
@@ -870,8 +871,7 @@ void producer_plugin::plugin_startup()
    threadpool.init();
 
 
-   auto abi_serializer_max_time = app().get_plugin<chain_plugin>().get_abi_serializer_max_time();
-   my->cxp_match_serializer.set_abi(fc::json::from_string(coinxp_match_abi).as<abi_def>(), abi_serializer_max_time);
+
    my->schedule_production_loop();
 
    ilog("producer plugin:  plugin_startup() end");
@@ -1183,8 +1183,16 @@ producer_plugin_impl::start_block_result producer_plugin_impl::start_block(bool 
                        ("block_num", chain.head_block_num() + 1)
                        ("prod", chain.pending_block_state()->header.producer)
                        ("txid", txid));
+
+               elog("[TRX_TRACE] Block ${block_num} for producer ${prod} is EXPIRING PERSISTED tx: ${txid}",
+                       ("block_num", chain.head_block_num() + 1)
+                       ("prod", chain.pending_block_state()->header.producer)
+                       ("txid", txid));
             } else {
                fc_dlog(_trx_trace_log, "[TRX_TRACE] Speculative execution is EXPIRING PERSISTED tx: ${txid}",
+                       ("txid", txid));
+
+               elog("[TRX_TRACE] Speculative execution is EXPIRING PERSISTED tx: ${txid}",
                        ("txid", txid));
             }
 
@@ -1195,11 +1203,15 @@ producer_plugin_impl::start_block_result producer_plugin_impl::start_block(bool 
          fc_dlog(_log, "Processed ${n} persisted transactions, Expired ${expired}",
                 ("n", orig_count)
                 ("expired", num_expired_persistent));
+         elog( "Processed ${n} persisted transactions, Expired ${expired}",
+                ("n", orig_count)
+                ("expired", num_expired_persistent));
       }
 
       try {
          size_t orig_pending_txn_size = _pending_incoming_transactions.size();
 
+         //elog("orig_pending_txn_size=${a}",("a",orig_pending_txn_size));
          // Processing unapplied transactions...
          //
          if (_producers.empty() && persisted_by_id.empty()) {
@@ -1258,6 +1270,7 @@ producer_plugin_impl::start_block_result producer_plugin_impl::start_block(bool 
                      }
 
                      auto trace = chain.push_transaction(trx, deadline);
+                     elog("chain.push_transaction");
                      if (trace->except) {
                         if (failure_is_subjective(*trace->except, deadline_is_subjective)) {
                            exhausted = true;
