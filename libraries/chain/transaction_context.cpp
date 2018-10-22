@@ -433,6 +433,7 @@ namespace eosio { namespace chain {
       acontext.receiver     = receiver;
 
       try {
+         elog("action account=${a} name=${b}",("a",a.account)("b",a.name));
          acontext.exec();
       } catch( ... ) {
          trace = move(acontext.trace);
