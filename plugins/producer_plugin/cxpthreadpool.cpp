@@ -60,7 +60,7 @@ void CxpThreadPool::run()
                 CxpTask task = m_taskQueue[m_read_queue].pop_Task();
                 fc::variant var = m_taskvarQueue[m_read_queue].pop_Task();
                 string name = m_taskstringQueue[m_read_queue].pop_Task();
-                elog("${a} ${b}",("a",name)("b",var));
+                //elog("${a} ${b}",("a",name)("b",var));
                 m_run_thread++;
 
                 lock.unlock();
@@ -102,7 +102,7 @@ void CxpThreadPool::init(int num)
 void CxpThreadPool::pause()
 {
 
-    ilog("CxpThreadPool push trxcount:${a} m_threadNum=${b}",("a",trxcount)("b",m_threadNum));
+    //ilog("CxpThreadPool push trxcount:${a} m_threadNum=${b}",("a",trxcount)("b",m_threadNum));
     trxcount=0;
     is_suspend=true;
     boost::unique_lock<boost::mutex> lock(m_mutex);
@@ -235,8 +235,8 @@ void CxpTransaction::dispatch_transaction(const CxpTask& task,const packed_trans
         if(account_str=="cxp.match" && name_str=="ask")
         {
             auto v=cxp_match_serializer.binary_to_variant(cxp_match_serializer.get_action_type(act_name),t.actions[0].data,abi_serializer_max_time);
-            string currency1=v["currency"].get_string();
-            string commodity1=v["commodity"].get_string();
+            //string currency1=v["currency"].get_string();
+            //string commodity1=v["commodity"].get_string();
             //size_t next=currency.find(' ');
             asset currency=asset::from_string(v["currency"].get_string());
             asset commodity=asset::from_string(v["commodity"].get_string());
@@ -289,7 +289,7 @@ void CxpTransaction::stop()
 void CxpTransaction::init()
 {
     if(m_threadNum <= 0) return;
-    m_contractPool.init(2);
+    m_contractPool.init(5);
     is_run = true;
     for (int i=0;i<m_threadNum;i++)
     {
@@ -306,7 +306,7 @@ void CxpTransaction::init()
 void CxpTransaction::pause()
 {
 
-    ilog("CxpTransaction push trxcount:${a}",("a",trxcount));
+    //ilog("CxpTransaction push trxcount:${a}",("a",trxcount));
     trxcount=0;
 
 
